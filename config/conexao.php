@@ -1,12 +1,10 @@
 <?php
-require_once ROOT_PATH . '/config.php';
 
 $host = 'localhost';
 $db   = 'otica_db';
 $user = 'root';
 $pass = '';
 $charset = 'utf8mb4';
-
 
 try {
     $pdo = new PDO(
