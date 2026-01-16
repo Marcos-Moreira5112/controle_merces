@@ -42,31 +42,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Login | Óticas Mercês</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="login-page">
 
-<h1>Login</h1>
+    <main class="login-container">
 
-<?php if ($erro): ?>
-    <p style="color:red"><?= $erro ?></p>
-<?php endif; ?>
+        <header class="login-header">
+            <h1>Óticas Mercês</h1>
+            <p>Controle interno</p>
+        </header>
 
-<form method="POST">
-    <label>
-        Email:<br>
-        <input type="email" name="email" required>
-    </label>
-    <br><br>
+        <section class="login-card">
 
-    <label>
-        Senha:<br>
-        <input type="password" name="senha" required>
-    </label>
-    <br><br>
+            <h2>Acesso ao sistema</h2>
 
-    <button type="submit">Entrar</button>
-</form>
+            <form method="POST">
+
+                <div class="campo">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+
+                <div class="campo">
+                    <label for="senha">Senha</label>
+                    <input type="password" id="senha" name="senha" required>
+                </div>
+
+                <button type="submit">Entrar</button>
+
+            </form>
+
+        </section>
+
+    </main>
 
 </body>
 </html>

@@ -52,7 +52,7 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $sqlUpdate = "
         UPDATE tarefas
         SET status = CASE 
-            WHEN status = 'pendente' THEN 'concluída'
+            WHEN status != 'concluida' THEN 'concluida'
             ELSE 'pendente'
         END
         WHERE id = :id AND usuario_id = :usuario_id
@@ -86,7 +86,6 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
     exit;
 }
 
-
 $sql = "
     SELECT id, titulo, prazo, status
     FROM tarefas
@@ -106,6 +105,13 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <title>Controle de Tarefas | Óticas Mercês</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 </head>
 <body>
 
@@ -116,10 +122,11 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </header>
 
     <!-- Conteúdo principal -->
-    <main>
+<main>
+    <div class="layout">
 
-        <!-- Nova tarefa -->
-        <section>
+        <!-- Coluna esquerda -->
+        <section class="nova-tarefa">
             <h2>Nova tarefa</h2>
 
             <form method="POST">
@@ -141,10 +148,8 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </form>
         </section>
 
-        <hr>
-
-        <!-- Lista de tarefas -->
-        <section>
+        <!-- Coluna direita -->
+        <section class="lista-tarefas">
             <h2>Minhas tarefas</h2>
 
             <?php if (count($tarefas) === 0): ?>
@@ -152,32 +157,31 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php else: ?>
                 <ul>
                     <?php foreach ($tarefas as $tarefa): ?>
-                        <li>
+                        <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
                             <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
                             <p>Prazo: <?= $tarefa['prazo'] ?></p>
                             <p>Status: <?= $tarefa['status'] ?></p>
 
                             <div>
-                                <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
+                                <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="acao-toggle">
                                     <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
                                 </a>
-
                                 |
-                                
-                                <a href="?acao=delete&id=<?= $tarefa['id'] ?>"
-                                   onclick="return confirm('Excluir esta tarefa?')">
+                                <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="acao-delete">
                                     Excluir
                                 </a>
                             </div>
                         </li>
-
                         <hr>
                     <?php endforeach; ?>
                 </ul>
             <?php endif; ?>
         </section>
 
-    </main>
+    </div>
+</main>
+
+    <script src="assets/js/main.js"></script>
 
 </body>
 </html>

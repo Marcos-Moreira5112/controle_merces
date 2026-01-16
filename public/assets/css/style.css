@@ -1,0 +1,315 @@
+/* =========================
+   Reset simples
+========================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* =========================
+   Fonte e cores base
+========================= */
+:root {
+    --azul-marinho: #0b2c4d;
+    --laranja: #f57c00;
+    --cinza-claro: #f4f6f8;
+    --cinza-texto: #333;
+    --branco: #ffffff;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--cinza-claro);
+    color: var(--cinza-texto);
+    line-height: 1.5;
+}
+
+/* =========================
+   Header
+========================= */
+header {
+    background-color: var(--azul-marinho);
+    color: var(--branco);
+    padding: 1.2rem 1rem;
+}
+
+header h1 {
+    font-size: 1.3rem;
+}
+
+header p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* =========================
+   Layout principal
+========================= */
+main {
+    padding: 1rem;
+}
+
+/* =========================
+   Seções
+========================= */
+section {
+    background-color: var(--branco);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+}
+
+/* =========================
+   Formulário
+========================= */
+label {
+    font-size: 0.9rem;
+}
+
+input[type="text"],
+input[type="date"] {
+    width: 100%;
+    padding: 0.6rem;
+    margin-top: 0.3rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+button {
+    margin-top: 0.8rem;
+    width: 100%;
+    padding: 0.7rem;
+    background-color: var(--laranja);
+    color: var(--branco);
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+/* =========================
+   Lista de tarefas
+========================= */
+ul {
+    list-style: none;
+}
+
+li {
+    padding: 0.5rem 0;
+}
+
+li h3 {
+    font-size: 1rem;
+}
+
+li p {
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+}
+
+/* =========================
+   Ações
+========================= */
+a {
+    font-size: 0.85rem;
+    color: var(--azul-marinho);
+    text-decoration: none;
+    margin-right: 0.5rem;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* =========================
+   Separadores
+========================= */
+hr {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 0.8rem 0;
+}
+
+/* Tarefa concluída */
+li.concluida {
+    opacity: 0.6;
+}
+
+li.concluida h3 {
+    text-decoration: line-through;
+}
+
+li {
+    transition: all 0.2s ease;
+}
+
+
+@media (min-width: 768px) {
+
+    main {
+        max-width: 1100px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .layout {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 2rem;
+        align-items: start;
+    }
+
+    .lista-tarefas ul {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .lista-tarefas li {
+        background-color: #fff;
+        padding: 1.2rem;
+        border-radius: 10px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    }
+
+    .lista-tarefas li:hover {
+        box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    }
+
+    .lista-tarefas hr {
+        display: none;
+    }
+
+    .lista-tarefas li h3 {
+        font-size: 1rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .lista-tarefas li p {
+        font-size: 0.8rem;
+        color: #555;
+    }
+
+    .lista-tarefas li div {
+        display: flex;
+        gap: 0.8rem;
+        margin-top: 0.8rem;
+    }
+
+    .acao-toggle {
+        color: var(--azul-marinho);
+        font-weight: 500;
+    }
+
+    .acao-delete {
+        color: #c62828;
+    }
+}
+
+@media (min-width: 1024px) {
+    main {
+        max-width: 1200px;
+        margin: 15px auto 0;
+    }
+}
+
+
+
+
+/* =========================
+   LOGIN
+========================= */
+
+.login-page {
+    min-height: 100vh;
+    background-color: var(--cinza-claro);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-container {
+    width: 100%;
+    padding: 1rem;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    border-radius: 10px;
+}
+
+.login-header h1 {
+    font-size: 1.5rem;
+    color: var(--branco);
+}
+
+.login-header p {
+    font-size: 0.9rem;
+    color: #ededed;
+}
+
+.login-card {
+    background-color: var(--branco);
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.login-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.login-card .campo {
+    margin-bottom: 1rem;
+}
+
+.login-card label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+}
+
+.login-card input {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.login-card button {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+/* =========================
+   LOGIN — DESKTOP
+========================= */
+@media (min-width: 768px) {
+
+    .login-container {
+        max-width: 420px;
+        padding: 0;
+    }
+
+    .login-card {
+        padding: 2rem;
+    }
+
+    .login-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .login-card h2 {
+        font-size: 1.2rem;
+    }
+
+}
