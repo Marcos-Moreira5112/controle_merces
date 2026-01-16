@@ -104,50 +104,80 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Tarefas</title>
+    <title>Controle de Tarefas | Óticas Mercês</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
-<h2>Nova tarefa</h2>
+    <!-- Header -->
+    <header>
+        <h1>Controle de Tarefas</h1>
+        <p>Óticas Mercês</p>
+    </header>
 
-<form method="POST">
-    <label>
-        Título:<br>
-        <input type="text" name="titulo" required>
-    </label>
-    <br><br>
+    <!-- Conteúdo principal -->
+    <main>
 
-    <label>
-        Prazo:<br>
-        <input type="date" name="prazo" required>
-    </label>
-    <br><br>
+        <!-- Nova tarefa -->
+        <section>
+            <h2>Nova tarefa</h2>
 
-    <button type="submit">Adicionar tarefa</button>
-</form>
+            <form method="POST">
+                <div>
+                    <label for="titulo">Título</label><br>
+                    <input type="text" id="titulo" name="titulo" required>
+                </div>
 
-<hr>
+                <br>
 
-<h1>Minhas tarefas</h1>
+                <div>
+                    <label for="prazo">Prazo</label><br>
+                    <input type="date" id="prazo" name="prazo" required>
+                </div>
 
-<?php if (count($tarefas) === 0): ?>
-    <p>Nenhuma tarefa cadastrada.</p>
-<?php else: ?>
-    <ul>
-        <?php foreach ($tarefas as $tarefa): ?>
-            <li>
-                <strong><?= htmlspecialchars($tarefa['titulo']) ?></strong><br>
-                Prazo: <?= $tarefa['prazo'] ?><br>
-                Status: <?= $tarefa['status'] ?><br>
-                <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
-                  <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
-                </a>
-                <a href="?acao=delete&id=<?= $tarefa['id'] ?>" onclick="return confirm('Excluir esta tarefa?')">Excluir</a>
-            </li>
-            <hr>
-        <?php endforeach; ?>
-    </ul>
-<?php endif; ?>
+                <br>
+
+                <button type="submit">Adicionar tarefa</button>
+            </form>
+        </section>
+
+        <hr>
+
+        <!-- Lista de tarefas -->
+        <section>
+            <h2>Minhas tarefas</h2>
+
+            <?php if (count($tarefas) === 0): ?>
+                <p>Nenhuma tarefa cadastrada.</p>
+            <?php else: ?>
+                <ul>
+                    <?php foreach ($tarefas as $tarefa): ?>
+                        <li>
+                            <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
+                            <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                            <p>Status: <?= $tarefa['status'] ?></p>
+
+                            <div>
+                                <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
+                                    <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
+                                </a>
+
+                                |
+                                
+                                <a href="?acao=delete&id=<?= $tarefa['id'] ?>"
+                                   onclick="return confirm('Excluir esta tarefa?')">
+                                    Excluir
+                                </a>
+                            </div>
+                        </li>
+
+                        <hr>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </section>
+
+    </main>
 
 </body>
 </html>
