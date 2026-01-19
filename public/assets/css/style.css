@@ -95,6 +95,13 @@ button:hover {
 /* =========================
    Lista de tarefas
 ========================= */
+
+.coluna-tarefas {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 ul {
     list-style: none;
 }

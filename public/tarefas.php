@@ -15,27 +15,25 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
-/*
-|--------------------------------------------------------------------------
-| CREATE - Nova tarefa
-|--------------------------------------------------------------------------
-*/
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $titulo = trim($_POST['titulo']);
     $prazo  = $_POST['prazo'];
+    $tipo = $_POST['tipo'] ?? 'normal';
 
     if ($titulo !== '' && $prazo !== '') {
 
         $sqlInsert = "
-            INSERT INTO tarefas (titulo, prazo, status, usuario_id)
-            VALUES (:titulo, :prazo, 'pendente', :usuario_id)
+            INSERT INTO tarefas (titulo, prazo, status, tipo, usuario_id)
+            VALUES (:titulo, :prazo, 'pendente', :tipo, :usuario_id)
         ";
 
         $stmtInsert = $pdo->prepare($sqlInsert);
         $stmtInsert->bindParam(':titulo', $titulo);
         $stmtInsert->bindParam(':prazo', $prazo);
         $stmtInsert->bindParam(':usuario_id', $usuario_id);
+        $stmtInsert->bindParam(':tipo', $tipo);
+
 
         $stmtInsert->execute();
     }
@@ -87,7 +85,7 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
 }
 
 $sql = "
-    SELECT id, titulo, prazo, status
+    SELECT id, titulo, prazo, status, tipo
     FROM tarefas
     WHERE usuario_id = :usuario_id
     ORDER BY prazo ASC
@@ -98,6 +96,18 @@ $stmt->bindParam(':usuario_id', $usuario_id);
 $stmt->execute();
 
 $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$tarefasNormais = [];
+$tarefasFixas   = [];
+
+foreach ($tarefas as $tarefa) {
+    if ($tarefa['tipo'] === 'fixa') {
+        $tarefasFixas[] = $tarefa;
+    } else {
+        $tarefasNormais[] = $tarefa;
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -144,39 +154,68 @@ $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 <br>
 
+                <div>
+                    <label for="tipo">Tipo da tarefa</label><br>
+                    <select id="tipo" name="tipo">
+                        <option value="normal">Tarefa</option>
+                        <option value="fixa">Tarefa fixa</option>
+                    </select>
+                </div>
+
                 <button type="submit">Adicionar tarefa</button>
             </form>
         </section>
 
         <!-- Coluna direita -->
-        <section class="lista-tarefas">
-            <h2>Minhas tarefas</h2>
+        <div class="coluna-tarefas">
 
-            <?php if (count($tarefas) === 0): ?>
-                <p>Nenhuma tarefa cadastrada.</p>
-            <?php else: ?>
-                <ul>
-                    <?php foreach ($tarefas as $tarefa): ?>
-                        <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
-                            <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                            <p>Prazo: <?= $tarefa['prazo'] ?></p>
-                            <p>Status: <?= $tarefa['status'] ?></p>
+            <section class="lista-tarefas">
+                <h2>Tarefas</h2>
+                <?php if (count($tarefasNormais) === 0): ?>
+                    <p>Nenhuma tarefa cadastrada.</p>
+                <?php else: ?>
+                    <ul>
+                        <?php foreach ($tarefasNormais as $tarefa): ?>
+                            <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
+                                <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
+                                <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                <div>
+                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
+                                        <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
+                                    </a>
+                                    |
+                                    <a href="?acao=delete&id=<?= $tarefa['id'] ?>">Excluir</a>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
 
-                            <div>
-                                <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="acao-toggle">
-                                    <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
-                                </a>
-                                |
-                                <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="acao-delete">
-                                    Excluir
-                                </a>
-                            </div>
-                        </li>
-                        <hr>
-                    <?php endforeach; ?>
-                </ul>
-            <?php endif; ?>
-        </section>
+            <section class="lista-tarefas">
+                <h2>Tarefas fixas</h2>
+                <?php if (count($tarefasFixas) === 0): ?>
+                    <p>Nenhuma tarefa fixa cadastrada.</p>
+                <?php else: ?>
+                    <ul>
+                        <?php foreach ($tarefasFixas as $tarefa): ?>
+                            <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
+                                <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
+                                <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                <div>
+                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
+                                        <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
+                                    </a>
+                                    |
+                                    <a href="?acao=delete&id=<?= $tarefa['id'] ?>">Excluir</a>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>''
+            
+        </div>
 
     </div>
 </main>
