@@ -84,8 +84,89 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
     exit;
 }
 
+$hoje = new DateTime('today');
+
+// buscar tarefas fixas pendentes
+$sqlFixas = "
+    SELECT *
+    FROM tarefas
+    WHERE tipo = 'fixa'
+      AND status = 'pendente'
+      AND usuario_id = :usuario_id
+";
+
+$stmtFixas = $pdo->prepare($sqlFixas);
+$stmtFixas->bindParam(':usuario_id', $usuario_id);
+$stmtFixas->execute();
+
+$tarefasFixas = $stmtFixas->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($tarefasFixas as $tarefa) {
+
+    $prazo = new DateTime($tarefa['prazo']);
+
+    // só gera próxima se já venceu
+    if ($prazo >= $hoje) {
+        continue;
+    }
+
+    // calcula próximo mês
+    $proximoPrazo = clone $prazo;
+    $proximoPrazo->modify('+1 month');
+
+    $mes = (int) $proximoPrazo->format('n');
+    $ano = (int) $proximoPrazo->format('Y');
+
+    // verificar se já existe tarefa para o próximo mês
+    $sqlExiste = "
+        SELECT COUNT(*) 
+        FROM tarefas
+        WHERE tipo = 'fixa'
+          AND usuario_id = :usuario_id
+          AND titulo = :titulo
+          AND mes_referencia = :mes
+          AND ano_referencia = :ano
+    ";
+
+    $stmtExiste = $pdo->prepare($sqlExiste);
+    $stmtExiste->execute([
+        ':usuario_id' => $usuario_id,
+        ':titulo'     => $tarefa['titulo'],
+        ':mes'        => $mes,
+        ':ano'        => $ano
+    ]);
+
+    if ($stmtExiste->fetchColumn() > 0) {
+        continue;
+    }
+
+    // definir tarefa origem
+    $origemId = $tarefa['tarefa_origem_id'] ?? $tarefa['id'];
+
+    // criar nova tarefa fixa
+    $sqlInsert = "
+        INSERT INTO tarefas (
+            titulo, prazo, status, tipo, usuario_id,
+            mes_referencia, ano_referencia, tarefa_origem_id
+        ) VALUES (
+            :titulo, :prazo, 'pendente', 'fixa', :usuario_id,
+            :mes, :ano, :origem
+        )
+    ";
+
+    $stmtInsert = $pdo->prepare($sqlInsert);
+    $stmtInsert->execute([
+        ':titulo'     => $tarefa['titulo'],
+        ':prazo'      => $proximoPrazo->format('Y-m-d'),
+        ':usuario_id' => $usuario_id,
+        ':mes'        => $mes,
+        ':ano'        => $ano,
+        ':origem'     => $origemId
+    ]);
+}
+
 $sql = "
-    SELECT id, titulo, prazo, status, tipo
+    SELECT id, titulo, prazo, status, tipo, observacoes
     FROM tarefas
     WHERE usuario_id = :usuario_id
     ORDER BY prazo ASC
@@ -179,6 +260,26 @@ foreach ($tarefas as $tarefa) {
                             <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
                                 <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
                                 <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                <p>Status: <?= $tarefa['status'] ?></p>
+
+                                <div class="observacoes-preview">
+                                    <strong>Observações:</strong>
+
+                                    <?php if (!empty($tarefa['observacoes'])): ?>
+                                        <p><?= nl2br(htmlspecialchars($tarefa['observacoes'])) ?></p>
+                                    <?php else: ?>
+                                        <p class="sem-observacoes">Nenhuma observação</p>
+                                    <?php endif; ?>
+                                </div>
+
+                                <button 
+                                    class="btn-observacoes"
+                                    data-id="<?= $tarefa['id'] ?>"
+                                    data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                >
+                                    Editar observações
+                                </button>
+
                                 <div>
                                     <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
                                         <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
@@ -202,6 +303,26 @@ foreach ($tarefas as $tarefa) {
                             <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
                                 <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
                                 <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                <p>Status: <?= $tarefa['status'] ?></p>
+
+                                <div class="observacoes-preview">
+                                    <strong>Observações:</strong>
+
+                                    <?php if (!empty($tarefa['observacoes'])): ?>
+                                        <p><?= nl2br(htmlspecialchars($tarefa['observacoes'])) ?></p>
+                                    <?php else: ?>
+                                        <p class="sem-observacoes">Nenhuma observação</p>
+                                    <?php endif; ?>
+                                </div>          
+                                
+                                <button 
+                                    class="btn-observacoes"
+                                    data-id="<?= $tarefa['id'] ?>"
+                                    data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                >
+                                    Editar observações
+                                </button>
+
                                 <div>
                                     <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
                                         <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
@@ -209,16 +330,40 @@ foreach ($tarefas as $tarefa) {
                                     |
                                     <a href="?acao=delete&id=<?= $tarefa['id'] ?>">Excluir</a>
                                 </div>
+
                             </li>
                         <?php endforeach; ?>
                     </ul>
                 <?php endif; ?>
-            </section>''
+            </section>
             
         </div>
 
     </div>
 </main>
+
+     <div id="modalObservacoes" class="modal hidden">
+            <div class="modal-content">
+                <h3>Observações da tarefa</h3>
+
+                <form method="POST" action="salvar_observacoes.php">
+                    <input type="hidden" name="tarefa_id" id="modalTarefaId">
+
+                    <textarea 
+                        name="observacoes" 
+                        id="modalObservacoesTexto"
+                        rows="6"
+                        placeholder="Anotações da tarefa..."
+                    ></textarea>
+
+                    <div class="modal-actions">
+                        <button type="submit">Salvar</button>
+                        <button type="button" id="fecharModal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+                                   
 
     <script src="assets/js/main.js"></script>
 
