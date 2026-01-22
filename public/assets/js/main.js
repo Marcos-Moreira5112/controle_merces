@@ -3,25 +3,29 @@ console.log("main.js carregado corretamente");
 document.addEventListener('DOMContentLoaded', () => {
 
     const modal = document.getElementById('modalObservacoes');
-    const modalTextarea = document.getElementById('modalObservacoesTexto');
-    const modalTarefaId = document.getElementById('modalTarefaId');
+    const textarea = document.getElementById('modalObservacoesTexto');
+    const tarefaIdInput = document.getElementById('modalTarefaId');
     const btnFechar = document.getElementById('fecharModal');
 
     // Abrir modal
     document.querySelectorAll('.btn-observacoes').forEach(botao => {
         botao.addEventListener('click', () => {
-            modalTarefaId.value = botao.dataset.id;
-            modalTextarea.value = botao.dataset.observacoes || '';
+            const id = botao.dataset.id;
+            const observacoes = botao.dataset.observacoes || '';
+
+            tarefaIdInput.value = id;
+            textarea.value = observacoes;
+
             modal.classList.remove('hidden');
         });
     });
 
-    // Fechar modal (botão cancelar)
+    // Fechar modal
     btnFechar.addEventListener('click', () => {
         modal.classList.add('hidden');
     });
 
-    // Fechar clicando fora
+    // Fechar clicando fora do conteúdo
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.classList.add('hidden');
@@ -29,3 +33,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+

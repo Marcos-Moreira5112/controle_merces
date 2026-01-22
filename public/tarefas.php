@@ -273,6 +273,7 @@ foreach ($tarefas as $tarefa) {
                                 </div>
 
                                 <button 
+                                    type="button"
                                     class="btn-observacoes"
                                     data-id="<?= $tarefa['id'] ?>"
                                     data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
@@ -316,6 +317,7 @@ foreach ($tarefas as $tarefa) {
                                 </div>          
                                 
                                 <button 
+                                    type="button"
                                     class="btn-observacoes"
                                     data-id="<?= $tarefa['id'] ?>"
                                     data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
