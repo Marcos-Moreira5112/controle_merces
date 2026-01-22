@@ -32,5 +32,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-});
+    // Confirmação antes de excluir tarefa
+    document.querySelectorAll('a[href*="acao=delete"]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const confirmacao = confirm('Tem certeza que deseja excluir esta tarefa?');
+            
+            if (confirmacao) {
+                window.location.href = link.href;
+            }
+        });
+    });
 
+});

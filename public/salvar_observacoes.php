@@ -25,5 +25,9 @@ $stmt->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
 $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
 $stmt->execute();
 
+// Mensagem de sucesso
+$_SESSION['mensagem'] = 'Observações salvas com sucesso!';
+$_SESSION['tipo_mensagem'] = 'sucesso';
+
 header('Location: tarefas.php');
 exit;

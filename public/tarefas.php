@@ -5,6 +5,11 @@ error_reporting(E_ALL);
 
 session_start();
 
+// Sistema de mensagens flash
+$mensagem = $_SESSION['mensagem'] ?? null;
+$tipo_mensagem = $_SESSION['tipo_mensagem'] ?? null;
+unset($_SESSION['mensagem'], $_SESSION['tipo_mensagem']);
+
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
 
@@ -21,8 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prazo  = $_POST['prazo'];
     $tipo = $_POST['tipo'] ?? 'normal';
 
-    if ($titulo !== '' && $prazo !== '') {
-
+    // Validar se a data não é anterior a hoje
+    $hoje = date('Y-m-d');
+    
+    if ($titulo === '' || $prazo === '') {
+        $_SESSION['mensagem'] = 'Preencha todos os campos obrigatórios!';
+        $_SESSION['tipo_mensagem'] = 'erro';
+    } elseif ($prazo < $hoje) {
+        $_SESSION['mensagem'] = 'A data não pode ser anterior a hoje!';
+        $_SESSION['tipo_mensagem'] = 'erro';
+    } else {
         $sqlInsert = "
             INSERT INTO tarefas (titulo, prazo, status, tipo, usuario_id)
             VALUES (:titulo, :prazo, 'pendente', :tipo, :usuario_id)
@@ -33,9 +46,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtInsert->bindParam(':prazo', $prazo);
         $stmtInsert->bindParam(':usuario_id', $usuario_id);
         $stmtInsert->bindParam(':tipo', $tipo);
-
-
         $stmtInsert->execute();
+
+        $_SESSION['mensagem'] = 'Tarefa adicionada com sucesso!';
+        $_SESSION['tipo_mensagem'] = 'sucesso';
     }
 
     header('Location: tarefas.php');
@@ -61,6 +75,9 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $stmtUpdate->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmtUpdate->execute();
 
+    $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
+    $_SESSION['tipo_mensagem'] = 'sucesso';
+
     header('Location: tarefas.php');
     exit;
 }
@@ -80,10 +97,12 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
     $stmtDelete->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmtDelete->execute();
 
+    $_SESSION['mensagem'] = 'Tarefa excluída com sucesso!';
+    $_SESSION['tipo_mensagem'] = 'sucesso';
+
     header('Location: tarefas.php');
     exit;
 }
-
 $hoje = new DateTime('today');
 
 // buscar tarefas fixas pendentes
@@ -99,9 +118,9 @@ $stmtFixas = $pdo->prepare($sqlFixas);
 $stmtFixas->bindParam(':usuario_id', $usuario_id);
 $stmtFixas->execute();
 
-$tarefasFixas = $stmtFixas->fetchAll(PDO::FETCH_ASSOC);
+$tarefasFixasPendentes = $stmtFixas->fetchAll(PDO::FETCH_ASSOC);
 
-foreach ($tarefasFixas as $tarefa) {
+foreach ($tarefasFixasPendentes as $tarefa) {
 
     $prazo = new DateTime($tarefa['prazo']);
 
@@ -178,10 +197,36 @@ $stmt->execute();
 
 $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// NOVO: Classificar tarefas e adicionar informações visuais
 $tarefasNormais = [];
 $tarefasFixas   = [];
 
+$contadorPendentes = 0;
+$contadorConcluidas = 0;
+
 foreach ($tarefas as $tarefa) {
+    
+    // Classificar status visual da tarefa
+    $prazoTarefa = new DateTime($tarefa['prazo']);
+    $statusVisual = 'futura'; // padrão
+    
+    if ($tarefa['status'] === 'concluida') {
+        $statusVisual = 'concluida';
+        $contadorConcluidas++;
+    } else {
+        $contadorPendentes++;
+        
+        if ($prazoTarefa < $hoje) {
+            $statusVisual = 'atrasada';
+            $diasAtraso = $hoje->diff($prazoTarefa)->days;
+            $tarefa['dias_atraso'] = $diasAtraso;
+        } elseif ($prazoTarefa == $hoje) {
+            $statusVisual = 'hoje';
+        }
+    }
+    
+    $tarefa['status_visual'] = $statusVisual;
+    
     if ($tarefa['tipo'] === 'fixa') {
         $tarefasFixas[] = $tarefa;
     } else {
@@ -205,12 +250,22 @@ foreach ($tarefas as $tarefa) {
 
 </head>
 <body>
-
-    <!-- Header -->
     <header>
-        <h1>Controle de Tarefas</h1>
-        <p>Óticas Mercês</p>
+        <div class="header-content">
+            <div>
+                <h1>Controle de Tarefas</h1>
+                <p>Óticas Mercês</p>
+            </div>
+            <a href="logout.php" class="btn-logout">Sair</a>
+        </div>
     </header>
+
+    <!-- Mensagens de feedback -->
+    <?php if ($mensagem): ?>
+        <div class="mensagem <?= $tipo_mensagem ?>">
+            <?= htmlspecialchars($mensagem) ?>
+        </div>
+    <?php endif; ?>
 
     <!-- Conteúdo principal -->
 <main>
@@ -230,7 +285,7 @@ foreach ($tarefas as $tarefa) {
 
                 <div>
                     <label for="prazo">Prazo</label><br>
-                    <input type="date" id="prazo" name="prazo" required>
+                    <input type="date" id="prazo" name="prazo" required min="<?= date('Y-m-d') ?>">
                 </div>
 
                 <br>
@@ -250,6 +305,13 @@ foreach ($tarefas as $tarefa) {
         <!-- Coluna direita -->
         <div class="coluna-tarefas">
 
+            <!-- Contador de tarefas -->
+            <div class="contador-tarefas">
+                <span class="contador-pendentes"><?= $contadorPendentes ?> pendentes</span>
+                <span class="separador">•</span>
+                <span class="contador-concluidas"><?= $contadorConcluidas ?> concluídas</span>
+            </div>
+
             <section class="lista-tarefas">
                 <h2>Tarefas</h2>
                 <?php if (count($tarefasNormais) === 0): ?>
@@ -257,9 +319,19 @@ foreach ($tarefas as $tarefa) {
                 <?php else: ?>
                     <ul>
                         <?php foreach ($tarefasNormais as $tarefa): ?>
-                            <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
+                            <li class="tarefa-card <?= $tarefa['status_visual'] ?>">
+                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                    <span class="badge-atraso"><?= $tarefa['dias_atraso'] ?>d</span>
+                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                    <span class="badge-hoje">HOJE</span>
+                                <?php endif; ?>
+                                
                                 <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                                <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                
+                                <p class="prazo-info">
+                                    Prazo: <?= date('d/m/Y', strtotime($tarefa['prazo'])) ?>
+                                </p>
+
                                 <p>Status: <?= $tarefa['status'] ?></p>
 
                                 <div class="observacoes-preview">
@@ -301,9 +373,19 @@ foreach ($tarefas as $tarefa) {
                 <?php else: ?>
                     <ul>
                         <?php foreach ($tarefasFixas as $tarefa): ?>
-                            <li class="<?= $tarefa['status'] === 'concluida' ? 'concluida' : '' ?>">
+                            <li class="tarefa-card <?= $tarefa['status_visual'] ?>">
+                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                    <span class="badge-atraso"><?= $tarefa['dias_atraso'] ?>d</span>
+                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                    <span class="badge-hoje">HOJE</span>
+                                <?php endif; ?>
+                                
                                 <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                                <p>Prazo: <?= $tarefa['prazo'] ?></p>
+                                
+                                <p class="prazo-info">
+                                    Prazo: <?= date('d/m/Y', strtotime($tarefa['prazo'])) ?>
+                                </p>
+
                                 <p>Status: <?= $tarefa['status'] ?></p>
 
                                 <div class="observacoes-preview">
