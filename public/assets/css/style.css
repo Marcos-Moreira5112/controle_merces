@@ -143,6 +143,16 @@ li p {
     margin-top: 0.2rem;
 }
 
+/* Estilo dos cards no mobile */
+li.tarefa-card {
+    background-color: #fff;
+    padding: 1rem;
+    margin-bottom: 1.5rem !important;
+    border-radius: 12px;
+    border: 2px solid #ccc;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+}
+
 /* =========================
    Ações
 ========================= */
@@ -179,13 +189,13 @@ li.tarefa-card {
 /* Tarefa atrasada - vermelho */
 li.tarefa-card.atrasada {
     border-left: 4px solid #d32f2f;
-    background-color: #ffffff;
+    background-color: #ffebee;
 }
 
 /* Tarefa vence hoje - laranja */
 li.tarefa-card.hoje {
     border-left: 4px solid #f57c00;
-    background-color: #ffffff;
+    background-color: #fff3e0;
 }
 
 /* Tarefa futura - azul */
@@ -395,13 +405,15 @@ li.tarefa-card h3 {
     .lista-tarefas li {
         background-color: #fff;
         padding: 1.2rem;
-        border-radius: 10px;
-        border: 1px solid #e6e6e6;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+        border-radius: 12px;
+        border: 2px solid #ccc;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+        margin-bottom: 0 !important;
     }
 
     .lista-tarefas li:hover {
-        box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        transform: translateY(-2px);
     }
 
     .lista-tarefas hr {
