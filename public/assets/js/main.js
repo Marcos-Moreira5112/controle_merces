@@ -45,4 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Confirmação antes de excluir PERMANENTEMENTE (histórico)
+    document.querySelectorAll('a[href*="acao=deletar"]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const confirmacao = confirm('⚠️ ATENÇÃO! Isso excluirá a tarefa PERMANENTEMENTE.\n\nEsta ação não pode ser desfeita!\n\nDeseja continuar?');
+            
+            if (confirmacao) {
+                window.location.href = link.href;
+            }
+        });
+    });
+
 });

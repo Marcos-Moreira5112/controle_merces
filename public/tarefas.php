@@ -82,27 +82,29 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     exit;
 }
 
-// DELETE - excluir tarefa
+// ARQUIVAR - marcar tarefa como arquivada (vai para histórico)
 if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
 
     $tarefa_id = (int) $_GET['id'];
 
-    $sqlDelete = "
-        DELETE FROM tarefas
-        WHERE id = :id AND usuario_id = :usuario_id
+    $sqlArquivar = "
+    UPDATE tarefas
+    SET arquivada = 1, data_arquivamento = NOW()
+    WHERE id = :id AND usuario_id = :usuario_id
     ";
 
-    $stmtDelete = $pdo->prepare($sqlDelete);
-    $stmtDelete->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
-    $stmtDelete->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmtDelete->execute();
+    $stmtArquivar = $pdo->prepare($sqlArquivar);
+    $stmtArquivar->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
+    $stmtArquivar->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmtArquivar->execute();
 
-    $_SESSION['mensagem'] = 'Tarefa excluída com sucesso!';
+    $_SESSION['mensagem'] = 'Tarefa movida para o histórico!';
     $_SESSION['tipo_mensagem'] = 'sucesso';
 
     header('Location: tarefas.php');
     exit;
 }
+
 $hoje = new DateTime('today');
 
 // buscar tarefas fixas pendentes
@@ -188,6 +190,7 @@ $sql = "
     SELECT id, titulo, prazo, status, tipo, observacoes
     FROM tarefas
     WHERE usuario_id = :usuario_id
+      AND arquivada = 0
     ORDER BY prazo ASC
 ";
 
@@ -256,7 +259,10 @@ foreach ($tarefas as $tarefa) {
                 <h1>Controle de Tarefas</h1>
                 <p>Óticas Mercês</p>
             </div>
-            <a href="logout.php" class="btn-logout">Sair</a>
+            <div class="header-actions">
+                <a href="historico.php" class="btn-historico">📋 Histórico</a>
+                <a href="logout.php" class="btn-logout">Sair</a>
+            </div>
         </div>
     </header>
 
