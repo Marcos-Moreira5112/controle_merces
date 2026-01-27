@@ -20,11 +20,43 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
+// Buscar informações do usuário logado (cargo)
+$sqlUsuario = "SELECT cargo, nome FROM usuarios WHERE id = :usuario_id";
+$stmtUsuario = $pdo->prepare($sqlUsuario);
+$stmtUsuario->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+$stmtUsuario->execute();
+$usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
+$cargoUsuario = $usuarioLogado['cargo'];
+$nomeUsuario = $usuarioLogado['nome'];
+
+// Buscar lista de usuários para atribuição de tarefas (só admin e supervisor veem)
+$usuariosDisponiveis = [];
+if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
+    $sqlUsuarios = "
+        SELECT id, nome, cargo 
+        FROM usuarios 
+        WHERE id != :usuario_id
+    ";
+    
+    // Supervisor só vê seus subordinados
+    if ($cargoUsuario === 'supervisor') {
+        $sqlUsuarios .= " AND supervisor_id = :usuario_id";
+    }
+    
+    $sqlUsuarios .= " ORDER BY nome ASC";
+    
+    $stmtUsuarios = $pdo->prepare($sqlUsuarios);
+    $stmtUsuarios->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmtUsuarios->execute();
+    $usuariosDisponiveis = $stmtUsuarios->fetchAll(PDO::FETCH_ASSOC);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $titulo = trim($_POST['titulo']);
     $prazo  = $_POST['prazo'];
     $tipo = $_POST['tipo'] ?? 'normal';
+    $atribuida_para = isset($_POST['atribuida_para']) && $_POST['atribuida_para'] !== '' ? (int)$_POST['atribuida_para'] : null;
 
     // Validar se a data não é anterior a hoje
     $hoje = date('Y-m-d');
@@ -37,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['tipo_mensagem'] = 'erro';
     } else {
         $sqlInsert = "
-            INSERT INTO tarefas (titulo, prazo, status, tipo, usuario_id)
-            VALUES (:titulo, :prazo, 'pendente', :tipo, :usuario_id)
+            INSERT INTO tarefas (titulo, prazo, status, tipo, usuario_id, atribuida_para)
+            VALUES (:titulo, :prazo, 'pendente', :tipo, :usuario_id, :atribuida_para)
         ";
 
         $stmtInsert = $pdo->prepare($sqlInsert);
@@ -46,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtInsert->bindParam(':prazo', $prazo);
         $stmtInsert->bindParam(':usuario_id', $usuario_id);
         $stmtInsert->bindParam(':tipo', $tipo);
+        $stmtInsert->bindParam(':atribuida_para', $atribuida_para, PDO::PARAM_INT);
         $stmtInsert->execute();
 
         $_SESSION['mensagem'] = 'Tarefa adicionada com sucesso!';
@@ -88,9 +121,9 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
     $tarefa_id = (int) $_GET['id'];
 
     $sqlArquivar = "
-    UPDATE tarefas
-    SET arquivada = 1, data_arquivamento = NOW()
-    WHERE id = :id AND usuario_id = :usuario_id
+        UPDATE tarefas
+        SET arquivada = 1, data_arquivamento = NOW()
+        WHERE id = :id AND usuario_id = :usuario_id
     ";
 
     $stmtArquivar = $pdo->prepare($sqlArquivar);
@@ -186,16 +219,62 @@ foreach ($tarefasFixasPendentes as $tarefa) {
     ]);
 }
 
-$sql = "
-    SELECT id, titulo, prazo, status, tipo, observacoes
-    FROM tarefas
-    WHERE usuario_id = :usuario_id
-      AND arquivada = 0
-    ORDER BY prazo ASC
-";
+// Montar query baseada no cargo do usuário
+if ($cargoUsuario === 'administrador') {
+    // Admin vê todas as tarefas
+    $sql = "
+        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes, 
+               t.usuario_id, t.atribuida_para,
+               u.nome as criador_nome,
+               ua.nome as atribuido_nome
+        FROM tarefas t
+        LEFT JOIN usuarios u ON t.usuario_id = u.id
+        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
+        WHERE t.arquivada = 0
+        ORDER BY t.prazo ASC
+    ";
+    $stmt = $pdo->prepare($sql);
+    
+} elseif ($cargoUsuario === 'supervisor') {
+    // Supervisor vê suas tarefas + tarefas dos subordinados
+    $sql = "
+        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
+               t.usuario_id, t.atribuida_para,
+               u.nome as criador_nome,
+               ua.nome as atribuido_nome
+        FROM tarefas t
+        LEFT JOIN usuarios u ON t.usuario_id = u.id
+        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
+        WHERE t.arquivada = 0
+          AND (t.usuario_id = :usuario_id 
+               OR t.atribuida_para = :usuario_id
+               OR t.usuario_id IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id2)
+               OR t.atribuida_para IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id3))
+        ORDER BY t.prazo ASC
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id3', $usuario_id, PDO::PARAM_INT);
+    
+} else {
+    // Funcionário vê apenas suas tarefas
+    $sql = "
+        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
+               t.usuario_id, t.atribuida_para,
+               u.nome as criador_nome,
+               ua.nome as atribuido_nome
+        FROM tarefas t
+        LEFT JOIN usuarios u ON t.usuario_id = u.id
+        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
+        WHERE t.arquivada = 0
+          AND (t.usuario_id = :usuario_id OR t.atribuida_para = :usuario_id)
+        ORDER BY t.prazo ASC
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+}
 
-$stmt = $pdo->prepare($sql);
-$stmt->bindParam(':usuario_id', $usuario_id);
 $stmt->execute();
 
 $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -257,9 +336,16 @@ foreach ($tarefas as $tarefa) {
         <div class="header-content">
             <div>
                 <h1>Controle de Tarefas</h1>
-                <p>Óticas Mercês</p>
+                <p>Óticas Mercês • <?= htmlspecialchars($nomeUsuario) ?> 
+                    <span class="badge-cargo <?= $cargoUsuario ?>">
+                        <?= ucfirst($cargoUsuario) ?>
+                    </span>
+                </p>
             </div>
             <div class="header-actions">
+                <?php if ($cargoUsuario === 'administrador'): ?>
+                    <a href="gerenciar_usuarios.php" class="btn-gerenciar">👥 Usuários</a>
+                <?php endif; ?>
                 <a href="historico.php" class="btn-historico">📋 Histórico</a>
                 <a href="logout.php" class="btn-logout">Sair</a>
             </div>
@@ -304,6 +390,22 @@ foreach ($tarefas as $tarefa) {
                     </select>
                 </div>
 
+                <?php if (!empty($usuariosDisponiveis)): ?>
+                    <br>
+                    <div>
+                        <label for="atribuida_para">Atribuir para (opcional)</label><br>
+                        <select id="atribuida_para" name="atribuida_para">
+                            <option value="">Eu mesmo</option>
+                            <?php foreach ($usuariosDisponiveis as $usuario): ?>
+                                <option value="<?= $usuario['id'] ?>">
+                                    <?= htmlspecialchars($usuario['nome']) ?> 
+                                    (<?= $usuario['cargo'] ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+
                 <button type="submit">Adicionar tarefa</button>
             </form>
         </section>
@@ -339,6 +441,19 @@ foreach ($tarefas as $tarefa) {
                                 </p>
 
                                 <p>Status: <?= $tarefa['status'] ?></p>
+                                
+                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                    <div class="info-atribuicao">
+                                        <p class="info-criador">
+                                            👤 Criada por: <strong><?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?></strong>
+                                        </p>
+                                        <?php if ($tarefa['atribuida_para']): ?>
+                                            <p class="info-atribuido">
+                                                📌 Atribuída para: <strong><?= htmlspecialchars($tarefa['atribuido_nome']) ?></strong>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
 
                                 <div class="observacoes-preview">
                                     <strong>Observações:</strong>
@@ -393,6 +508,19 @@ foreach ($tarefas as $tarefa) {
                                 </p>
 
                                 <p>Status: <?= $tarefa['status'] ?></p>
+                                
+                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                    <div class="info-atribuicao">
+                                        <p class="info-criador">
+                                            👤 Criada por: <strong><?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?></strong>
+                                        </p>
+                                        <?php if ($tarefa['atribuida_para']): ?>
+                                            <p class="info-atribuido">
+                                                📌 Atribuída para: <strong><?= htmlspecialchars($tarefa['atribuido_nome']) ?></strong>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
 
                                 <div class="observacoes-preview">
                                     <strong>Observações:</strong>

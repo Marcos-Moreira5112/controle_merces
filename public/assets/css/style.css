@@ -51,6 +51,32 @@ header p {
     opacity: 0.9;
 }
 
+/* Badge de cargo do usuário */
+.badge-cargo {
+    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.badge-cargo.administrador {
+    background-color: #ffd700;
+    color: #333;
+}
+
+.badge-cargo.supervisor {
+    background-color: #4caf50;
+    color: white;
+}
+
+.badge-cargo.funcionario {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
 .header-actions {
     display: flex;
     gap: 0.8rem;
@@ -59,7 +85,8 @@ header p {
 
 .btn-logout,
 .btn-historico,
-.btn-voltar {
+.btn-voltar,
+.btn-gerenciar {
     background-color: rgba(255, 255, 255, 0.1);
     color: var(--branco);
     padding: 0.5rem 1.2rem;
@@ -71,7 +98,8 @@ header p {
 
 .btn-logout:hover,
 .btn-historico:hover,
-.btn-voltar:hover {
+.btn-voltar:hover,
+.btn-gerenciar:hover {
     background-color: rgba(255, 255, 255, 0.2);
     text-decoration: none;
 }
@@ -255,6 +283,29 @@ li.tarefa-card h3 {
 
 .prazo-info {
     display: block;
+}
+
+/* =========================
+   INFORMAÇÕES DE ATRIBUIÇÃO
+========================= */
+.info-atribuicao {
+    background-color: #f0f4ff;
+    border-left: 3px solid #5c7cfa;
+    padding: 0.6rem;
+    margin: 0.8rem 0;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.info-criador,
+.info-atribuido {
+    margin: 0.2rem 0;
+    color: #495057;
+}
+
+.info-criador strong,
+.info-atribuido strong {
+    color: #1864ab;
 }
 
 /* =========================
