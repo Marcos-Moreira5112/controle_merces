@@ -40,21 +40,23 @@
 .aviso-expiracao {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
     border-radius: var(--radius-md);
-    color: #92400e;
+    color: #78350f;
     font-size: 0.9rem;
+    border: 1px solid #f59e0b;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
 }
 
 .aviso-expiracao svg {
     flex-shrink: 0;
-    color: #d97706;
+    color: #b45309;
 }
 
 .aviso-expiracao strong {
-    font-weight: 600;
+    font-weight: 700;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -66,7 +68,8 @@
     padding: 4rem 2rem;
     background: white;
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
+    border: 1px solid #e2e8f0;
 }
 
 .empty-icon {
@@ -74,7 +77,7 @@
 }
 
 .empty-icon svg {
-    color: #cbd5e1;
+    color: #94a3b8;
 }
 
 .empty-state h3 {
@@ -85,7 +88,7 @@
 }
 
 .empty-state p {
-    color: var(--cinza-secundario);
+    color: #64748b;
     max-width: 400px;
     margin: 0 auto 1.5rem auto;
     line-height: 1.6;
@@ -102,6 +105,7 @@
     text-decoration: none;
     font-weight: 600;
     transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(245, 124, 0, 0.3);
 }
 
 .btn-voltar-tarefas:hover {
@@ -132,18 +136,21 @@
 }
 
 .grupo-titulo {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--cinza-secundario);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #475569;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
+    background: #e2e8f0;
+    padding: 0.35rem 0.75rem;
+    border-radius: 4px;
 }
 
 .grupo-linha {
     flex: 1;
-    height: 1px;
-    background: #e5e7eb;
+    height: 2px;
+    background: linear-gradient(90deg, #cbd5e1 0%, transparent 100%);
 }
 
 .grupo-tarefas {
@@ -159,24 +166,28 @@
 .tarefa-arquivada {
     background: white;
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     overflow: hidden;
     transition: all 0.2s;
-    border-left: 4px solid #94a3b8;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #64748b;
 }
 
 .tarefa-arquivada:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    border-color: #cbd5e1;
 }
 
 .tarefa-arquivada.alerta {
     border-left-color: #f59e0b;
-    background: linear-gradient(135deg, white 0%, #fffbeb 100%);
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: #fcd34d;
 }
 
 .tarefa-arquivada.critico {
     border-left-color: #ef4444;
-    background: linear-gradient(135deg, white 0%, #fef2f2 100%);
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #fca5a5;
 }
 
 .tarefa-main {
@@ -192,12 +203,12 @@
 }
 
 .tarefa-titulo {
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    color: var(--azul-marinho);
+    color: #334155;
     margin: 0 0 0.75rem 0;
     text-decoration: line-through;
-    opacity: 0.7;
+    text-decoration-color: #94a3b8;
 }
 
 .tarefa-meta {
@@ -213,64 +224,76 @@
     align-items: center;
     gap: 0.35rem;
     font-size: 0.85rem;
-    color: var(--cinza-secundario);
+    color: #475569;
+    font-weight: 500;
 }
 
 .meta-item svg {
     flex-shrink: 0;
+    color: #64748b;
 }
 
 .meta-item.usuario {
-    background: #f1f5f9;
-    padding: 0.25rem 0.5rem;
+    background: #e2e8f0;
+    padding: 0.3rem 0.6rem;
     border-radius: var(--radius-sm);
+    border: 1px solid #cbd5e1;
 }
 
 /* Badges de Status e Tipo */
 .badge-status {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.7rem;
     border-radius: 20px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .badge-status.concluida {
-    background: #d1fae5;
-    color: #065f46;
+    background: #10b981;
+    color: white;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
 .badge-status.pendente {
-    background: #fef3c7;
-    color: #92400e;
+    background: #f59e0b;
+    color: white;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
 }
 
 .badge-tipo {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.6rem;
-    background: #e0e7ff;
-    color: #3730a3;
+    gap: 0.3rem;
+    padding: 0.25rem 0.7rem;
+    background: #6366f1;
+    color: white;
     border-radius: 20px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
 }
 
 /* Observações */
 .tarefa-observacoes {
-    padding: 0.75rem;
-    background: #f8fafc;
+    padding: 0.75rem 1rem;
+    background: #f1f5f9;
     border-radius: var(--radius-sm);
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
+    border-left: 3px solid #94a3b8;
 }
 
 .tarefa-observacoes p {
     margin: 0;
     font-size: 0.85rem;
-    color: var(--cinza-secundario);
+    color: #475569;
     line-height: 1.5;
+    font-style: italic;
 }
 
 /* Expiração */
@@ -282,19 +305,33 @@
 
 .expiracao-info {
     text-align: center;
-    min-width: 100px;
+    min-width: 120px;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: var(--radius-sm);
+    border: 1px solid #e2e8f0;
 }
 
 .expiracao-texto {
     display: block;
     font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--cinza-secundario);
+    font-weight: 700;
+    color: #475569;
     margin-bottom: 0.5rem;
 }
 
+.expiracao-info.alerta {
+    background: #fffbeb;
+    border-color: #fcd34d;
+}
+
 .expiracao-info.alerta .expiracao-texto {
-    color: #d97706;
+    color: #b45309;
+}
+
+.expiracao-info.critico {
+    background: #fef2f2;
+    border-color: #fca5a5;
 }
 
 .expiracao-info.critico .expiracao-texto {
@@ -303,68 +340,84 @@
 
 .expiracao-barra {
     width: 100%;
-    height: 4px;
-    background: #e5e7eb;
-    border-radius: 2px;
+    height: 6px;
+    background: #cbd5e1;
+    border-radius: 3px;
     overflow: hidden;
 }
 
 .expiracao-progresso {
     height: 100%;
-    background: #94a3b8;
-    border-radius: 2px;
+    background: #64748b;
+    border-radius: 3px;
     transition: width 0.3s;
 }
 
 .expiracao-info.alerta .expiracao-progresso {
-    background: #f59e0b;
+    background: linear-gradient(90deg, #f59e0b, #d97706);
 }
 
 .expiracao-info.critico .expiracao-progresso {
-    background: #ef4444;
+    background: linear-gradient(90deg, #ef4444, #dc2626);
 }
 
-/* Ações */
+/* ═══════════════════════════════════════════════════════════════════════════
+   AÇÕES - CORRIGIDO ESTICAMENTO DOS BOTÕES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 .tarefa-acoes {
     display: flex;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: #f8fafc;
-    border-top: 1px solid #e5e7eb;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: #f1f5f9;
+    border-top: 1px solid #e2e8f0;
 }
 
 .btn-restaurar,
 .btn-excluir {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 1rem;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     text-decoration: none;
-    border: none;
+    border: 2px solid transparent;
     font-family: inherit;
+    flex-shrink: 0;
+    width: auto;
 }
 
 .btn-restaurar {
-    background: #ecfdf5;
-    color: #059669;
+    background: #10b981;
+    color: white;
+    border-color: #059669;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
 .btn-restaurar:hover {
-    background: #d1fae5;
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
 }
 
 .btn-excluir {
-    background: #fef2f2;
+    background: white;
     color: #dc2626;
+    border-color: #dc2626;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.15);
 }
 
 .btn-excluir:hover {
-    background: #fee2e2;
+    background: #dc2626;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.4);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -377,7 +430,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -397,11 +450,13 @@
     background: white;
     border-radius: var(--radius-lg);
     padding: 2rem;
-    max-width: 400px;
+    max-width: 420px;
     width: 90%;
     text-align: center;
     transform: scale(0.9);
     transition: transform 0.2s;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border: 1px solid #e2e8f0;
 }
 
 .modal-overlay.ativo .modal-confirmacao {
@@ -410,28 +465,39 @@
 
 .modal-icon {
     margin-bottom: 1rem;
+    background: #fef3c7;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    margin-right: auto;
+    border: 3px solid #f59e0b;
 }
 
 .modal-icon svg {
-    color: #f59e0b;
+    color: #b45309;
 }
 
 .modal-confirmacao h3 {
-    font-size: 1.25rem;
+    font-size: 1.35rem;
     font-weight: 700;
     color: var(--azul-marinho);
     margin: 0 0 0.75rem 0;
 }
 
 .modal-confirmacao p {
-    color: var(--cinza-secundario);
+    color: #64748b;
     margin: 0 0 1.5rem 0;
-    line-height: 1.5;
+    line-height: 1.6;
+    font-size: 0.95rem;
 }
 
 .modal-confirmacao #modal-tarefa-nome {
-    font-weight: 600;
-    color: var(--cinza-texto);
+    font-weight: 700;
+    color: var(--azul-marinho);
 }
 
 .modal-acoes {
@@ -442,34 +508,38 @@
 
 .btn-cancelar,
 .btn-confirmar-excluir {
-    padding: 0.75rem 1.5rem;
+    padding: 0.8rem 1.75rem;
     border-radius: var(--radius-md);
     font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    border: none;
+    border: 2px solid transparent;
     text-decoration: none;
     font-family: inherit;
 }
 
 .btn-cancelar {
-    background: #f1f5f9;
-    color: var(--cinza-texto);
+    background: #e2e8f0;
+    color: #475569;
+    border-color: #cbd5e1;
 }
 
 .btn-cancelar:hover {
-    background: #e2e8f0;
+    background: #cbd5e1;
+    border-color: #94a3b8;
 }
 
 .btn-confirmar-excluir {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: white;
+    border-color: #b91c1c;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
 }
 
 .btn-confirmar-excluir:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -485,20 +555,23 @@
     gap: 0.75rem;
     padding: 1rem 1.5rem;
     border-radius: var(--radius-md);
-    font-weight: 500;
+    font-weight: 600;
     z-index: 999;
     animation: slideIn 0.3s ease;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    border: 1px solid transparent;
 }
 
 .mensagem-toast.sucesso {
     background: linear-gradient(135deg, #10b981, #059669);
     color: white;
+    border-color: #047857;
 }
 
 .mensagem-toast.erro {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: white;
+    border-color: #b91c1c;
 }
 
 .mensagem-toast.fade-out {
@@ -557,6 +630,7 @@
         display: flex;
         align-items: center;
         gap: 1rem;
+        padding: 0.75rem 1rem;
     }
     
     .expiracao-texto {
@@ -574,6 +648,7 @@
     
     .btn-restaurar,
     .btn-excluir {
+        width: 100%;
         justify-content: center;
     }
     
@@ -587,6 +662,11 @@
     .modal-acoes {
         flex-direction: column;
     }
+    
+    .btn-cancelar,
+    .btn-confirmar-excluir {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -598,6 +678,11 @@
     .aviso-expiracao {
         flex-direction: column;
         text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .grupo-titulo {
+        font-size: 0.75rem;
     }
 }
 
@@ -617,10 +702,12 @@
     font-weight: 500;
     font-size: 0.9rem;
     transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .header-actions .btn-nav:hover {
     background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
     transform: translateY(-1px);
 }
 

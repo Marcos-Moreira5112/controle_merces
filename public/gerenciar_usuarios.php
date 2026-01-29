@@ -68,12 +68,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['tipo_mensagem'] = 'erro';
         } else {
             if ($acao === 'criar') {
-                $senha = gerarSenha(10);
+                // Gera senha legível e depois faz o hash para salvar
+                $senhaLegivel = gerarSenha(10);
+                $senhaHash = password_hash($senhaLegivel, PASSWORD_DEFAULT);
+                
                 $sql = "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo) 
                         VALUES (:nome, :email, :senha, :cargo, :supervisor_id, 1)";
                 $stmt = $pdo->prepare($sql);
-                $stmt->bindParam(':senha', $senha);
-                $mensagemExtra = " Senha gerada: <strong>$senha</strong> (anote e informe ao usuário!)";
+                $stmt->bindParam(':senha', $senhaHash); // Salva o HASH, não a senha
+                $mensagemExtra = " Senha gerada: <strong>$senhaLegivel</strong> (anote e informe ao usuário!)";
             } else {
                 $sql = "UPDATE usuarios SET nome = :nome, email = :email, cargo = :cargo, supervisor_id = :supervisor_id 
                         WHERE id = :id";
@@ -88,19 +91,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT | PDO::PARAM_NULL);
             $stmt->execute();
 
-            $_SESSION['mensagem'] = ($acao === 'criar' ? 'Usuário criado com sucesso!' : 'Usuário atualizado!') . $mensagemExtra;
+            $_SESSION['mensagem'] = ($acao === 'criar' ? 'Usuário criado com sucesso!' : 'Usuário atualizado!') . ($mensagemExtra ?? '');
             $_SESSION['tipo_mensagem'] = 'sucesso';
         }
     } elseif ($acao === 'reset_senha') {
         $id = (int)$_POST['id'];
-        $novaSenha = gerarSenha(10);
+        
+        // Gera senha legível e depois faz o hash para salvar
+        $senhaLegivel = gerarSenha(10);
+        $senhaHash = password_hash($senhaLegivel, PASSWORD_DEFAULT);
+        
         $sql = "UPDATE usuarios SET senha = :senha WHERE id = :id";
         $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':senha', $novaSenha);
+        $stmt->bindParam(':senha', $senhaHash); // Salva o HASH
         $stmt->bindParam(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
 
-        $_SESSION['mensagem'] = "Senha resetada! Nova senha: <strong>$novaSenha</strong> (entregue ao usuário!)";
+        $_SESSION['mensagem'] = "Senha resetada! Nova senha: <strong>$senhaLegivel</strong> (entregue ao usuário!)";
         $_SESSION['tipo_mensagem'] = 'sucesso';
     } elseif ($acao === 'toggle_ativo') {
         $id = (int)$_POST['id'];
@@ -163,7 +170,6 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="header-actions">
                 <a href="dashboard.php" class="btn-gerenciar">🏠 Dashboard</a>
-                <!-- ... resto dos botões ... -->
             </div>            
             <div class="header-actions">
                 <a href="tarefas.php" class="btn-voltar">← Voltar para Tarefas</a>
@@ -211,11 +217,9 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
                 </thead>
                 <tbody>
                     <?php foreach ($usuarios as $user): 
-                        // Gerar iniciais
                         $iniciais = strtoupper(substr($user['nome'], 0, 1) . (strpos($user['nome'], ' ') ? substr(strrchr($user['nome'], ' '), 1, 1) : ''));
                         $cargoClass = strtolower($user['cargo']);
                         
-                        // Buscar nome do supervisor
                         $supervisorNome = '—';
                         if ($user['supervisor_id']) {
                             $sqlSup = "SELECT nome FROM usuarios WHERE id = :sup_id";
@@ -252,14 +256,12 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
                             </td>
                             <td>
                                 <div class="actions">
-                                    <!-- Editar -->
                                     <button class="action-btn" title="Editar" onclick="abrirEditar(<?= $user['id'] ?>, '<?= addslashes($user['nome']) ?>', '<?= addslashes($user['email']) ?>', '<?= $user['cargo'] ?>', <?= $user['supervisor_id'] ?? 'null' ?>)">
                                         <svg class="icon-action" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                                         </svg>
                                     </button>
 
-                                    <!-- Reset Senha -->
                                     <form method="POST" style="display: inline;">
                                         <input type="hidden" name="acao" value="reset_senha">
                                         <input type="hidden" name="id" value="<?= $user['id'] ?>">
@@ -270,7 +272,6 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
                                         </button>
                                     </form>
 
-                                    <!-- Ativar/Desativar -->
                                     <form method="POST" style="display: inline;">
                                         <input type="hidden" name="acao" value="toggle_ativo">
                                         <input type="hidden" name="id" value="<?= $user['id'] ?>">
@@ -375,31 +376,26 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <script>
-        // Abrir modal
         function abrirModal(id) {
             document.getElementById(id).classList.remove('hidden');
         }
 
-        // Fechar modal
         function fecharModal(id) {
             document.getElementById(id).classList.add('hidden');
         }
 
-        // Fechar modal ao clicar fora
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.classList.add('hidden');
             }
         }
 
-        // Toggle supervisor
         function toggleSupervisor(cargoId, divId) {
             const cargo = document.getElementById(cargoId).value;
             const divSupervisor = document.getElementById(divId);
             divSupervisor.style.display = (cargo === 'funcionario') ? 'block' : 'none';
         }
 
-        // Abrir modal de edição
         function abrirEditar(id, nome, email, cargo, supervisorId) {
             document.getElementById('editId').value = id;
             document.getElementById('editNome').value = nome;

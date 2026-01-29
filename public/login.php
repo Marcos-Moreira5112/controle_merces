@@ -27,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($usuario && $senha === $usuario['senha']) {
+    // Usa password_verify() para comparar com o hash
+    if ($usuario && password_verify($senha, $usuario['senha'])) {
         $_SESSION['usuario_id'] = $usuario['id'];
         header('Location: dashboard.php');
         exit;

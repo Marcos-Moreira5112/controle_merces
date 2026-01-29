@@ -29,6 +29,13 @@ $usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
 $cargoUsuario = $usuarioLogado['cargo'];
 $nomeUsuario = $usuarioLogado['nome'];
 
+// ═══════════════════════════════════════════════════════════════
+// FILTROS E BUSCA
+// ═══════════════════════════════════════════════════════════════
+$filtro_busca = trim($_GET['busca'] ?? '');
+$filtro_status = $_GET['status'] ?? 'todos';
+$filtro_tipo = $_GET['tipo'] ?? 'todos';
+
 // Buscar lista de usuários para atribuição de tarefas (só admin e supervisor veem)
 $usuariosDisponiveis = [];
 if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
@@ -107,7 +114,13 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
     $_SESSION['tipo_mensagem'] = 'sucesso';
 
-    header('Location: tarefas.php');
+    // Preservar filtros ao redirecionar
+    $params = http_build_query([
+        'busca' => $filtro_busca,
+        'status' => $filtro_status,
+        'tipo' => $filtro_tipo
+    ]);
+    header('Location: tarefas.php?' . $params);
     exit;
 }
 
@@ -129,7 +142,13 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
     $_SESSION['mensagem'] = 'Tarefa movida para o histórico!';
     $_SESSION['tipo_mensagem'] = 'sucesso';
 
-    header('Location: tarefas.php');
+    // Preservar filtros ao redirecionar
+    $params = http_build_query([
+        'busca' => $filtro_busca,
+        'status' => $filtro_status,
+        'tipo' => $filtro_tipo
+    ]);
+    header('Location: tarefas.php?' . $params);
     exit;
 }
 
@@ -208,6 +227,32 @@ foreach ($tarefasFixasPendentes as $tarefa) {
     ]);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MONTAR QUERY COM FILTROS
+// ═══════════════════════════════════════════════════════════════
+$params = [];
+$where_extra = "";
+
+// Filtro de busca por título
+if ($filtro_busca !== '') {
+    $where_extra .= " AND t.titulo LIKE :busca";
+    $params[':busca'] = '%' . $filtro_busca . '%';
+}
+
+// Filtro por tipo
+if ($filtro_tipo === 'normal') {
+    $where_extra .= " AND t.tipo = 'normal'";
+} elseif ($filtro_tipo === 'fixa') {
+    $where_extra .= " AND t.tipo = 'fixa'";
+}
+
+// Filtro por status (será aplicado depois no PHP para "atrasada")
+if ($filtro_status === 'pendente') {
+    $where_extra .= " AND t.status = 'pendente'";
+} elseif ($filtro_status === 'concluida') {
+    $where_extra .= " AND t.status = 'concluida'";
+}
+
 // Montar query baseada no cargo do usuário
 if ($cargoUsuario === 'administrador') {
     $sql = "
@@ -218,7 +263,7 @@ if ($cargoUsuario === 'administrador') {
         FROM tarefas t
         LEFT JOIN usuarios u ON t.usuario_id = u.id
         LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
-        WHERE t.arquivada = 0
+        WHERE t.arquivada = 0 {$where_extra}
         ORDER BY t.prazo ASC
     ";
     $stmt = $pdo->prepare($sql);
@@ -234,15 +279,17 @@ if ($cargoUsuario === 'administrador') {
         LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
         WHERE t.arquivada = 0
           AND (t.usuario_id = :usuario_id 
-               OR t.atribuida_para = :usuario_id
-               OR t.usuario_id IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id2)
-               OR t.atribuida_para IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id3))
+               OR t.atribuida_para = :usuario_id2
+               OR t.usuario_id IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id3)
+               OR t.atribuida_para IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id4))
+          {$where_extra}
         ORDER BY t.prazo ASC
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
     $stmt->bindParam(':usuario_id3', $usuario_id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id4', $usuario_id, PDO::PARAM_INT);
     
 } else {
     $sql = "
@@ -254,11 +301,18 @@ if ($cargoUsuario === 'administrador') {
         LEFT JOIN usuarios u ON t.usuario_id = u.id
         LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
         WHERE t.arquivada = 0
-          AND (t.usuario_id = :usuario_id OR t.atribuida_para = :usuario_id)
+          AND (t.usuario_id = :usuario_id OR t.atribuida_para = :usuario_id2)
+          {$where_extra}
         ORDER BY t.prazo ASC
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
+}
+
+// Bind dos parâmetros extras (busca, etc)
+foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
 }
 
 $stmt->execute();
@@ -295,12 +349,23 @@ foreach ($tarefas as $tarefa) {
     
     $tarefa['status_visual'] = $statusVisual;
     
+    // Filtro de atrasadas (feito aqui pois depende de cálculo de data)
+    if ($filtro_status === 'atrasada' && $statusVisual !== 'atrasada') {
+        continue;
+    }
+    
     if ($tarefa['tipo'] === 'fixa') {
         $tarefasFixas[] = $tarefa;
     } else {
         $tarefasNormais[] = $tarefa;
     }
 }
+
+// Total filtrado
+$totalFiltrado = count($tarefasNormais) + count($tarefasFixas);
+
+// Verificar se há filtros ativos
+$filtrosAtivos = ($filtro_busca !== '' || $filtro_status !== 'todos' || $filtro_tipo !== 'todos');
 
 // Função para formatar prazo de forma amigável
 function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
@@ -317,6 +382,17 @@ function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
         }
         return date('d/m/Y', strtotime($prazo));
     }
+}
+
+// Função auxiliar para manter filtros nos links
+function buildFilterUrl($params = []) {
+    $current = [
+        'busca' => $_GET['busca'] ?? '',
+        'status' => $_GET['status'] ?? 'todos',
+        'tipo' => $_GET['tipo'] ?? 'todos'
+    ];
+    $merged = array_merge($current, $params);
+    return '?' . http_build_query($merged);
 }
 ?>
 <!DOCTYPE html>
@@ -451,6 +527,120 @@ function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
             </div>
         </div>
 
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- BARRA DE FILTROS E BUSCA -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <div class="filtros-bar">
+            <!-- Busca -->
+            <form method="GET" class="filtro-busca-form">
+                <!-- Manter filtros atuais -->
+                <input type="hidden" name="status" value="<?= htmlspecialchars($filtro_status) ?>">
+                <input type="hidden" name="tipo" value="<?= htmlspecialchars($filtro_tipo) ?>">
+                
+                <div class="busca-wrapper">
+                    <svg class="busca-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    <input 
+                        type="text" 
+                        name="busca" 
+                        placeholder="Buscar tarefas..." 
+                        value="<?= htmlspecialchars($filtro_busca) ?>"
+                        class="busca-input"
+                    >
+                    <?php if ($filtro_busca !== ''): ?>
+                        <a href="<?= buildFilterUrl(['busca' => '']) ?>" class="busca-limpar" title="Limpar busca">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </form>
+
+            <!-- Filtros Rápidos de Status -->
+            <div class="filtros-grupo">
+                <span class="filtros-label">Status:</span>
+                <div class="filtros-botoes">
+                    <a href="<?= buildFilterUrl(['status' => 'todos']) ?>" 
+                       class="filtro-btn <?= $filtro_status === 'todos' ? 'ativo' : '' ?>">
+                        Todos
+                    </a>
+                    <a href="<?= buildFilterUrl(['status' => 'pendente']) ?>" 
+                       class="filtro-btn <?= $filtro_status === 'pendente' ? 'ativo' : '' ?>">
+                        <span class="filtro-dot pendente"></span>
+                        Pendentes
+                    </a>
+                    <a href="<?= buildFilterUrl(['status' => 'atrasada']) ?>" 
+                       class="filtro-btn <?= $filtro_status === 'atrasada' ? 'ativo' : '' ?>">
+                        <span class="filtro-dot atrasada"></span>
+                        Atrasadas
+                    </a>
+                    <a href="<?= buildFilterUrl(['status' => 'concluida']) ?>" 
+                       class="filtro-btn <?= $filtro_status === 'concluida' ? 'ativo' : '' ?>">
+                        <span class="filtro-dot concluida"></span>
+                        Concluídas
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filtro por Tipo -->
+            <div class="filtros-grupo">
+                <span class="filtros-label">Tipo:</span>
+                <div class="filtros-botoes">
+                    <a href="<?= buildFilterUrl(['tipo' => 'todos']) ?>" 
+                       class="filtro-btn <?= $filtro_tipo === 'todos' ? 'ativo' : '' ?>">
+                        Todos
+                    </a>
+                    <a href="<?= buildFilterUrl(['tipo' => 'normal']) ?>" 
+                       class="filtro-btn <?= $filtro_tipo === 'normal' ? 'ativo' : '' ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M9 12l2 2 4-4"/>
+                        </svg>
+                        Únicas
+                    </a>
+                    <a href="<?= buildFilterUrl(['tipo' => 'fixa']) ?>" 
+                       class="filtro-btn <?= $filtro_tipo === 'fixa' ? 'ativo' : '' ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+                        </svg>
+                        Recorrentes
+                    </a>
+                </div>
+            </div>
+
+            <!-- Limpar Filtros -->
+            <?php if ($filtrosAtivos): ?>
+                <a href="tarefas.php" class="btn-limpar-filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/>
+                        <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    </svg>
+                    Limpar filtros
+                </a>
+            <?php endif; ?>
+        </div>
+
+        <!-- Indicador de Resultados -->
+        <?php if ($filtrosAtivos): ?>
+            <div class="filtros-resultado">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+                <span>
+                    Mostrando <strong><?= $totalFiltrado ?></strong> tarefa<?= $totalFiltrado !== 1 ? 's' : '' ?>
+                    <?php if ($filtro_busca !== ''): ?>
+                        para "<strong><?= htmlspecialchars($filtro_busca) ?></strong>"
+                    <?php endif; ?>
+                </span>
+            </div>
+        <?php endif; ?>
+
         <!-- Main Grid -->
         <div class="tarefas-grid">
             
@@ -544,262 +734,290 @@ function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
                 <!-- Quick Tips -->
                 <div class="tips-card">
                     <h3>💡 Dica</h3>
-                    <p>Tarefas <strong>recorrentes</strong> se renovam automaticamente todo mês no mesmo dia.</p>
+                    <p>Use os <strong>filtros</strong> acima para encontrar tarefas rapidamente por status ou tipo.</p>
                 </div>
             </aside>
 
             <!-- Main Content: Lista de Tarefas -->
             <div class="tarefas-main">
                 
-                <!-- Tarefas Normais -->
-                <section class="tasks-section">
-                    <div class="section-header">
-                        <h2>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-                                <rect x="9" y="3" width="6" height="4" rx="1"/>
-                                <line x1="9" y1="12" x2="15" y2="12"/>
-                                <line x1="9" y1="16" x2="15" y2="16"/>
+                <?php if ($totalFiltrado === 0 && $filtrosAtivos): ?>
+                    <!-- Nenhum resultado com filtros -->
+                    <div class="empty-filtros">
+                        <div class="empty-filtros-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
+                                <line x1="8" y1="11" x2="14" y2="11"/>
                             </svg>
-                            Tarefas
-                        </h2>
-                        <span class="section-count"><?= count($tarefasNormais) ?></span>
+                        </div>
+                        <h3>Nenhuma tarefa encontrada</h3>
+                        <p>Não encontramos tarefas com os filtros selecionados.</p>
+                        <a href="tarefas.php" class="btn-voltar-lista">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="12" x2="5" y2="12"/>
+                                <polyline points="12 19 5 12 12 5"/>
+                            </svg>
+                            Ver todas as tarefas
+                        </a>
                     </div>
-                    
-                    <?php if (count($tarefasNormais) === 0): ?>
-                        <div class="empty-tasks">
-                            <div class="empty-illustration">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <?php else: ?>
+                
+                    <!-- Tarefas Normais (só mostra se não filtrou por tipo "fixa") -->
+                    <?php if ($filtro_tipo !== 'fixa'): ?>
+                    <section class="tasks-section">
+                        <div class="section-header">
+                            <h2>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
                                     <rect x="9" y="3" width="6" height="4" rx="1"/>
-                                    <path d="M9 14l2 2 4-4"/>
+                                    <line x1="9" y1="12" x2="15" y2="12"/>
+                                    <line x1="9" y1="16" x2="15" y2="16"/>
                                 </svg>
+                                Tarefas
+                            </h2>
+                            <span class="section-count"><?= count($tarefasNormais) ?></span>
+                        </div>
+                        
+                        <?php if (count($tarefasNormais) === 0): ?>
+                            <div class="empty-tasks">
+                                <div class="empty-illustration">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                                        <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                        <path d="M9 14l2 2 4-4"/>
+                                    </svg>
+                                </div>
+                                <p>Nenhuma tarefa encontrada</p>
+                                <span>Crie sua primeira tarefa ao lado!</span>
                             </div>
-                            <p>Nenhuma tarefa cadastrada</p>
-                            <span>Crie sua primeira tarefa ao lado!</span>
-                        </div>
-                    <?php else: ?>
-                        <div class="tasks-list">
-                            <?php foreach ($tarefasNormais as $tarefa): ?>
-                                <div class="task-item <?= $tarefa['status_visual'] ?>">
-                                    <!-- Checkbox -->
-                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
-                                        <?php if ($tarefa['status'] === 'concluida'): ?>
-                                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                            </svg>
-                                        <?php else: ?>
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <circle cx="12" cy="12" r="10"/>
-                                            </svg>
-                                        <?php endif; ?>
-                                    </a>
-                                    
-                                    <!-- Content -->
-                                    <div class="task-content">
-                                        <div class="task-header">
-                                            <h3 class="task-title"><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                                            <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
-                                                <span class="task-badge overdue">
-                                                    <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
-                                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                                                    </svg>
-                                                    <?= $tarefa['dias_atraso'] ?>d
-                                                </span>
-                                            <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
-                                                <span class="task-badge today">Hoje</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <div class="task-meta">
-                                            <span class="task-date <?= $tarefa['status_visual'] ?>">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                                    <line x1="16" y1="2" x2="16" y2="6"/>
-                                                    <line x1="8" y1="2" x2="8" y2="6"/>
-                                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                        <?php else: ?>
+                            <div class="tasks-list">
+                                <?php foreach ($tarefasNormais as $tarefa): ?>
+                                    <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                        <!-- Checkbox -->
+                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                            <?php if ($tarefa['status'] === 'concluida'): ?>
+                                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                                                 </svg>
-                                                <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
-                                            </span>
-                                            
-                                            <?php if ($cargoUsuario !== 'funcionario'): ?>
-                                                <!-- Criador da tarefa -->
-                                                <span class="task-creator">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                                                        <circle cx="12" cy="7" r="4"/>
-                                                    </svg>
-                                                    <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
-                                                </span>
-                                                
-                                                <!-- Atribuído para (se diferente do criador) -->
-                                                <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
-                                                    <span class="task-assignee">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <path d="M22 2L11 13"/>
-                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                            <?php else: ?>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                </svg>
+                                            <?php endif; ?>
+                                        </a>
+                                        
+                                        <!-- Content -->
+                                        <div class="task-content">
+                                            <div class="task-header">
+                                                <h3 class="task-title"><?= htmlspecialchars($tarefa['titulo']) ?></h3>
+                                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                                    <span class="task-badge overdue">
+                                                        <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
+                                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                                                         </svg>
-                                                        → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
+                                                        <?= $tarefa['dias_atraso'] ?>d
                                                     </span>
+                                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                                    <span class="task-badge today">Hoje</span>
                                                 <?php endif; ?>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <?php if (!empty($tarefa['observacoes'])): ?>
-                                            <div class="task-notes">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                                                    <polyline points="14 2 14 8 20 8"/>
-                                                    <line x1="16" y1="13" x2="8" y2="13"/>
-                                                    <line x1="16" y1="17" x2="8" y2="17"/>
-                                                </svg>
-                                                <span><?= htmlspecialchars(substr($tarefa['observacoes'], 0, 60)) ?><?= strlen($tarefa['observacoes']) > 60 ? '...' : '' ?></span>
                                             </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <!-- Actions -->
-                                    <div class="task-actions">
-                                        <button 
-                                            type="button"
-                                            class="action-btn btn-observacoes"
-                                            data-id="<?= $tarefa['id'] ?>"
-                                            data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
-                                            title="Observações"
-                                        >
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                            </svg>
-                                        </button>
-                                        <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="3 6 5 6 21 6"/>
-                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </section>
-
-                <!-- Tarefas Fixas -->
-                <section class="tasks-section recurring">
-                    <div class="section-header">
-                        <h2>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <polyline points="1 20 1 14 7 14"/>
-                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                            </svg>
-                            Tarefas Recorrentes
-                        </h2>
-                        <span class="section-count"><?= count($tarefasFixas) ?></span>
-                    </div>
-                    
-                    <?php if (count($tarefasFixas) === 0): ?>
-                        <div class="empty-tasks compact">
-                            <p>Nenhuma tarefa recorrente</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="tasks-list">
-                            <?php foreach ($tarefasFixas as $tarefa): ?>
-                                <div class="task-item <?= $tarefa['status_visual'] ?>">
-                                    <!-- Checkbox -->
-                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
-                                        <?php if ($tarefa['status'] === 'concluida'): ?>
-                                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                            </svg>
-                                        <?php else: ?>
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <circle cx="12" cy="12" r="10"/>
-                                            </svg>
-                                        <?php endif; ?>
-                                    </a>
-                                    
-                                    <!-- Content -->
-                                    <div class="task-content">
-                                        <div class="task-header">
-                                            <h3 class="task-title">
-                                                <?= htmlspecialchars($tarefa['titulo']) ?>
-                                                <span class="recurring-badge">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                                        <polyline points="23 4 23 10 17 10"/>
-                                                        <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+                                            
+                                            <div class="task-meta">
+                                                <span class="task-date <?= $tarefa['status_visual'] ?>">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                                        <line x1="16" y1="2" x2="16" y2="6"/>
+                                                        <line x1="8" y1="2" x2="8" y2="6"/>
+                                                        <line x1="3" y1="10" x2="21" y2="10"/>
                                                     </svg>
+                                                    <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
                                                 </span>
-                                            </h3>
-                                            <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
-                                                <span class="task-badge overdue">
-                                                    <?= $tarefa['dias_atraso'] ?>d
-                                                </span>
-                                            <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
-                                                <span class="task-badge today">Hoje</span>
+                                                
+                                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                    <!-- Criador da tarefa -->
+                                                    <span class="task-creator">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                                            <circle cx="12" cy="7" r="4"/>
+                                                        </svg>
+                                                        <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
+                                                    </span>
+                                                    
+                                                    <!-- Atribuído para (se diferente do criador) -->
+                                                    <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
+                                                        <span class="task-assignee">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M22 2L11 13"/>
+                                                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                                            </svg>
+                                                            → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <?php if (!empty($tarefa['observacoes'])): ?>
+                                                <div class="task-notes">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                                        <polyline points="14 2 14 8 20 8"/>
+                                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                                    </svg>
+                                                    <span><?= htmlspecialchars(substr($tarefa['observacoes'], 0, 60)) ?><?= strlen($tarefa['observacoes']) > 60 ? '...' : '' ?></span>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
                                         
-                                        <div class="task-meta">
-                                            <span class="task-date <?= $tarefa['status_visual'] ?>">
+                                        <!-- Actions -->
+                                        <div class="task-actions">
+                                            <button 
+                                                type="button"
+                                                class="action-btn btn-observacoes"
+                                                data-id="<?= $tarefa['id'] ?>"
+                                                data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                                title="Observações"
+                                            >
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                                    <line x1="16" y1="2" x2="16" y2="6"/>
-                                                    <line x1="8" y1="2" x2="8" y2="6"/>
-                                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                                 </svg>
-                                                <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
-                                            </span>
-                                            
-                                            <?php if ($cargoUsuario !== 'funcionario'): ?>
-                                                <span class="task-creator">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                                                        <circle cx="12" cy="7" r="4"/>
-                                                    </svg>
-                                                    <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
-                                                </span>
-                                                
-                                                <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
-                                                    <span class="task-assignee">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <path d="M22 2L11 13"/>
-                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                                                        </svg>
-                                                        → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
-                                                    </span>
-                                                <?php endif; ?>
-                                            <?php endif; ?>
+                                            </button>
+                                            <a href="?acao=delete&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"/>
+                                                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                                </svg>
+                                            </a>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Actions -->
-                                    <div class="task-actions">
-                                        <button 
-                                            type="button"
-                                            class="action-btn btn-observacoes"
-                                            data-id="<?= $tarefa['id'] ?>"
-                                            data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
-                                            title="Observações"
-                                        >
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                            </svg>
-                                        </button>
-                                        <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="3 6 5 6 21 6"/>
-                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
                     <?php endif; ?>
-                </section>
+
+                    <!-- Tarefas Fixas (só mostra se não filtrou por tipo "normal") -->
+                    <?php if ($filtro_tipo !== 'normal'): ?>
+                    <section class="tasks-section recurring">
+                        <div class="section-header">
+                            <h2>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                                </svg>
+                                Tarefas Recorrentes
+                            </h2>
+                            <span class="section-count"><?= count($tarefasFixas) ?></span>
+                        </div>
+                        
+                        <?php if (count($tarefasFixas) === 0): ?>
+                            <div class="empty-tasks compact">
+                                <p>Nenhuma tarefa recorrente encontrada</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="tasks-list">
+                                <?php foreach ($tarefasFixas as $tarefa): ?>
+                                    <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                        <!-- Checkbox -->
+                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                            <?php if ($tarefa['status'] === 'concluida'): ?>
+                                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                                </svg>
+                                            <?php else: ?>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                </svg>
+                                            <?php endif; ?>
+                                        </a>
+                                        
+                                        <!-- Content -->
+                                        <div class="task-content">
+                                            <div class="task-header">
+                                                <h3 class="task-title">
+                                                    <?= htmlspecialchars($tarefa['titulo']) ?>
+                                                    <span class="recurring-badge">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                                            <polyline points="23 4 23 10 17 10"/>
+                                                            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+                                                        </svg>
+                                                    </span>
+                                                </h3>
+                                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                                    <span class="task-badge overdue">
+                                                        <?= $tarefa['dias_atraso'] ?>d
+                                                    </span>
+                                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                                    <span class="task-badge today">Hoje</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <div class="task-meta">
+                                                <span class="task-date <?= $tarefa['status_visual'] ?>">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                                        <line x1="16" y1="2" x2="16" y2="6"/>
+                                                        <line x1="8" y1="2" x2="8" y2="6"/>
+                                                        <line x1="3" y1="10" x2="21" y2="10"/>
+                                                    </svg>
+                                                    <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
+                                                </span>
+                                                
+                                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                    <span class="task-creator">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                                            <circle cx="12" cy="7" r="4"/>
+                                                        </svg>
+                                                        <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
+                                                    </span>
+                                                    
+                                                    <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
+                                                        <span class="task-assignee">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M22 2L11 13"/>
+                                                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                                            </svg>
+                                                            → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Actions -->
+                                        <div class="task-actions">
+                                            <button 
+                                                type="button"
+                                                class="action-btn btn-observacoes"
+                                                data-id="<?= $tarefa['id'] ?>"
+                                                data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                                title="Observações"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                </svg>
+                                            </button>
+                                            <a href="?acao=delete&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3 6 5 6 21 6"/>
+                                                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+                    <?php endif; ?>
+                    
+                <?php endif; ?>
 
             </div>
         </div>
