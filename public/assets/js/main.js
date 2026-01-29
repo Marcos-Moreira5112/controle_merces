@@ -59,3 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+// Fechar modal pelo overlay
+document.querySelector('.modal-overlay')?.addEventListener('click', function() {
+    document.getElementById('modalObservacoes').classList.add('hidden');
+});
+
+// Fechar modal pelo botão cancelar
+document.getElementById('cancelarModal')?.addEventListener('click', function() {
+    document.getElementById('modalObservacoes').classList.add('hidden');
+});

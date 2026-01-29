@@ -1,0 +1,56 @@
+/* =========================
+   BASE.CSS
+   Reset, variáveis e tipografia
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --azul-marinho: #0b2c4d;
+    --laranja: #f57c00;
+    --verde: #10b981;
+    --vermelho: #ef4444;
+    --azul: #3b82f6;
+    --cinza-claro: #f4f6f8;
+    --cinza-texto: #333;
+    --cinza-secundario: #64748b;
+    --branco: #ffffff;
+    --sombra-leve: 0 2px 8px rgba(0,0,0,0.08);
+    --sombra-media: 0 4px 16px rgba(0,0,0,0.12);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--cinza-claro);
+    color: var(--cinza-texto);
+    line-height: 1.5;
+}
+
+/* Links */
+a {
+    color: var(--azul-marinho);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Listas */
+ul {
+    list-style: none;
+}
+
+/* Separadores */
+hr {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 0.8rem 0;
+}

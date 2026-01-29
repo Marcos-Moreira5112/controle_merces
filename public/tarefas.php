@@ -38,7 +38,6 @@ if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
         WHERE id != :usuario_id
     ";
     
-    // Supervisor só vê seus subordinados
     if ($cargoUsuario === 'supervisor') {
         $sqlUsuarios .= " AND supervisor_id = :usuario_id";
     }
@@ -52,13 +51,11 @@ if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     $titulo = trim($_POST['titulo']);
     $prazo  = $_POST['prazo'];
     $tipo = $_POST['tipo'] ?? 'normal';
     $atribuida_para = isset($_POST['atribuida_para']) && $_POST['atribuida_para'] !== '' ? (int)$_POST['atribuida_para'] : null;
 
-    // Validar se a data não é anterior a hoje
     $hoje = date('Y-m-d');
     
     if ($titulo === '' || $prazo === '') {
@@ -91,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // UPDATE - alterar status da tarefa
 if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
-
     $tarefa_id = (int) $_GET['id'];
 
     $sqlUpdate = "
@@ -115,9 +111,8 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     exit;
 }
 
-// ARQUIVAR - marcar tarefa como arquivada (vai para histórico)
+// ARQUIVAR
 if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
-
     $tarefa_id = (int) $_GET['id'];
 
     $sqlArquivar = "
@@ -140,7 +135,7 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
 
 $hoje = new DateTime('today');
 
-// buscar tarefas fixas pendentes
+// Lógica de tarefas fixas
 $sqlFixas = "
     SELECT *
     FROM tarefas
@@ -156,22 +151,18 @@ $stmtFixas->execute();
 $tarefasFixasPendentes = $stmtFixas->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($tarefasFixasPendentes as $tarefa) {
-
     $prazo = new DateTime($tarefa['prazo']);
 
-    // só gera próxima se já venceu
     if ($prazo >= $hoje) {
         continue;
     }
 
-    // calcula próximo mês
     $proximoPrazo = clone $prazo;
     $proximoPrazo->modify('+1 month');
 
     $mes = (int) $proximoPrazo->format('n');
     $ano = (int) $proximoPrazo->format('Y');
 
-    // verificar se já existe tarefa para o próximo mês
     $sqlExiste = "
         SELECT COUNT(*) 
         FROM tarefas
@@ -194,10 +185,8 @@ foreach ($tarefasFixasPendentes as $tarefa) {
         continue;
     }
 
-    // definir tarefa origem
     $origemId = $tarefa['tarefa_origem_id'] ?? $tarefa['id'];
 
-    // criar nova tarefa fixa
     $sqlInsert = "
         INSERT INTO tarefas (
             titulo, prazo, status, tipo, usuario_id,
@@ -221,7 +210,6 @@ foreach ($tarefasFixasPendentes as $tarefa) {
 
 // Montar query baseada no cargo do usuário
 if ($cargoUsuario === 'administrador') {
-    // Admin vê todas as tarefas
     $sql = "
         SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes, 
                t.usuario_id, t.atribuida_para,
@@ -236,7 +224,6 @@ if ($cargoUsuario === 'administrador') {
     $stmt = $pdo->prepare($sql);
     
 } elseif ($cargoUsuario === 'supervisor') {
-    // Supervisor vê suas tarefas + tarefas dos subordinados
     $sql = "
         SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
                t.usuario_id, t.atribuida_para,
@@ -258,7 +245,6 @@ if ($cargoUsuario === 'administrador') {
     $stmt->bindParam(':usuario_id3', $usuario_id, PDO::PARAM_INT);
     
 } else {
-    // Funcionário vê apenas suas tarefas
     $sql = "
         SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
                t.usuario_id, t.atribuida_para,
@@ -276,21 +262,19 @@ if ($cargoUsuario === 'administrador') {
 }
 
 $stmt->execute();
-
 $tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// NOVO: Classificar tarefas e adicionar informações visuais
+// Classificar tarefas
 $tarefasNormais = [];
 $tarefasFixas   = [];
-
 $contadorPendentes = 0;
 $contadorConcluidas = 0;
+$contadorAtrasadas = 0;
+$contadorHoje = 0;
 
 foreach ($tarefas as $tarefa) {
-    
-    // Classificar status visual da tarefa
     $prazoTarefa = new DateTime($tarefa['prazo']);
-    $statusVisual = 'futura'; // padrão
+    $statusVisual = 'futura';
     
     if ($tarefa['status'] === 'concluida') {
         $statusVisual = 'concluida';
@@ -302,8 +286,10 @@ foreach ($tarefas as $tarefa) {
             $statusVisual = 'atrasada';
             $diasAtraso = $hoje->diff($prazoTarefa)->days;
             $tarefa['dias_atraso'] = $diasAtraso;
+            $contadorAtrasadas++;
         } elseif ($prazoTarefa == $hoje) {
             $statusVisual = 'hoje';
+            $contadorHoje++;
         }
     }
     
@@ -316,26 +302,37 @@ foreach ($tarefas as $tarefa) {
     }
 }
 
+// Função para formatar prazo de forma amigável
+function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
+    if ($statusVisual === 'atrasada') {
+        return $diasAtraso . ' dia' . ($diasAtraso > 1 ? 's' : '') . ' de atraso';
+    } elseif ($statusVisual === 'hoje') {
+        return 'Vence hoje';
+    } else {
+        $hoje = new DateTime();
+        $dataPrazo = new DateTime($prazo);
+        $diff = $hoje->diff($dataPrazo)->days;
+        if ($diff <= 7) {
+            return 'em ' . $diff . ' dia' . ($diff > 1 ? 's' : '');
+        }
+        return date('d/m/Y', strtotime($prazo));
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Controle de Tarefas | Óticas Mercês</title>
+    <title>Tarefas | Óticas Mercês</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="assets/css/style.css">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="tarefas-page">
     <header>
         <div class="header-content">
             <div>
-                <h1>Controle de Tarefas</h1>
+                <h1>Tarefas</h1>
                 <p>Óticas Mercês • <?= htmlspecialchars($nomeUsuario) ?> 
                     <span class="badge-cargo <?= $cargoUsuario ?>">
                         <?= ucfirst($cargoUsuario) ?>
@@ -343,247 +340,519 @@ foreach ($tarefas as $tarefa) {
                 </p>
             </div>
             <div class="header-actions">
+                <a href="dashboard.php" class="btn-gerenciar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Dashboard
+                </a>
                 <?php if ($cargoUsuario === 'administrador'): ?>
-                    <a href="gerenciar_usuarios.php" class="btn-gerenciar">👥 Usuários</a>
+                    <a href="gerenciar_usuarios.php" class="btn-gerenciar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                        </svg>
+                        Usuários
+                    </a>
                 <?php endif; ?>
-                <a href="historico.php" class="btn-historico">📋 Histórico</a>
+                <a href="historico.php" class="btn-gerenciar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Histórico
+                </a>
                 <a href="logout.php" class="btn-logout">Sair</a>
             </div>
         </div>
     </header>
 
-    <!-- Mensagens de feedback -->
+    <!-- Toast de mensagem -->
     <?php if ($mensagem): ?>
-        <div class="mensagem <?= $tipo_mensagem ?>">
-            <?= htmlspecialchars($mensagem) ?>
+        <div class="toast <?= $tipo_mensagem ?>">
+            <div class="toast-icon">
+                <?php if ($tipo_mensagem === 'sucesso'): ?>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                <?php else: ?>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                <?php endif; ?>
+            </div>
+            <span><?= htmlspecialchars($mensagem) ?></span>
+            <button class="toast-close" onclick="this.parentElement.remove()">×</button>
         </div>
     <?php endif; ?>
 
-    <!-- Conteúdo principal -->
-<main>
-    <div class="layout">
-
-        <!-- Coluna esquerda -->
-        <section class="nova-tarefa">
-            <h2>Nova tarefa</h2>
-
-            <form method="POST">
-                <div>
-                    <label for="titulo">Título</label><br>
-                    <input type="text" id="titulo" name="titulo" required>
+    <main class="tarefas-container">
+        
+        <!-- Stats Cards -->
+        <div class="tarefas-stats">
+            <div class="mini-stat">
+                <div class="mini-stat-icon total">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                        <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    </svg>
                 </div>
-
-                <br>
-
-                <div>
-                    <label for="prazo">Prazo</label><br>
-                    <input type="date" id="prazo" name="prazo" required min="<?= date('Y-m-d') ?>">
+                <div class="mini-stat-info">
+                    <span class="mini-stat-value"><?= count($tarefas) ?></span>
+                    <span class="mini-stat-label">Total</span>
                 </div>
-
-                <br>
-
-                <div>
-                    <label for="tipo">Tipo da tarefa</label><br>
-                    <select id="tipo" name="tipo">
-                        <option value="normal">Tarefa</option>
-                        <option value="fixa">Tarefa fixa</option>
-                    </select>
-                </div>
-
-                <?php if (!empty($usuariosDisponiveis)): ?>
-                    <br>
-                    <div>
-                        <label for="atribuida_para">Atribuir para (opcional)</label><br>
-                        <select id="atribuida_para" name="atribuida_para">
-                            <option value="">Eu mesmo</option>
-                            <?php foreach ($usuariosDisponiveis as $usuario): ?>
-                                <option value="<?= $usuario['id'] ?>">
-                                    <?= htmlspecialchars($usuario['nome']) ?> 
-                                    (<?= $usuario['cargo'] ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                <?php endif; ?>
-
-                <button type="submit">Adicionar tarefa</button>
-            </form>
-        </section>
-
-        <!-- Coluna direita -->
-        <div class="coluna-tarefas">
-
-            <!-- Contador de tarefas -->
-            <div class="contador-tarefas">
-                <span class="contador-pendentes"><?= $contadorPendentes ?> pendentes</span>
-                <span class="separador">•</span>
-                <span class="contador-concluidas"><?= $contadorConcluidas ?> concluídas</span>
             </div>
-
-            <section class="lista-tarefas">
-                <h2>Tarefas</h2>
-                <?php if (count($tarefasNormais) === 0): ?>
-                    <p>Nenhuma tarefa cadastrada.</p>
-                <?php else: ?>
-                    <ul>
-                        <?php foreach ($tarefasNormais as $tarefa): ?>
-                            <li class="tarefa-card <?= $tarefa['status_visual'] ?>">
-                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
-                                    <span class="badge-atraso"><?= $tarefa['dias_atraso'] ?>d</span>
-                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
-                                    <span class="badge-hoje">HOJE</span>
-                                <?php endif; ?>
-                                
-                                <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                                
-                                <p class="prazo-info">
-                                    Prazo: <?= date('d/m/Y', strtotime($tarefa['prazo'])) ?>
-                                </p>
-
-                                <p>Status: <?= $tarefa['status'] ?></p>
-                                
-                                <?php if ($cargoUsuario !== 'funcionario'): ?>
-                                    <div class="info-atribuicao">
-                                        <p class="info-criador">
-                                            👤 Criada por: <strong><?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?></strong>
-                                        </p>
-                                        <?php if ($tarefa['atribuida_para']): ?>
-                                            <p class="info-atribuido">
-                                                📌 Atribuída para: <strong><?= htmlspecialchars($tarefa['atribuido_nome']) ?></strong>
-                                            </p>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="observacoes-preview">
-                                    <strong>Observações:</strong>
-
-                                    <?php if (!empty($tarefa['observacoes'])): ?>
-                                        <p><?= nl2br(htmlspecialchars($tarefa['observacoes'])) ?></p>
-                                    <?php else: ?>
-                                        <p class="sem-observacoes">Nenhuma observação</p>
-                                    <?php endif; ?>
-                                </div>
-
-                                <button 
-                                    type="button"
-                                    class="btn-observacoes"
-                                    data-id="<?= $tarefa['id'] ?>"
-                                    data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
-                                >
-                                    Editar observações
-                                </button>
-
-                                <div>
-                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
-                                        <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
-                                    </a>
-                                    |
-                                    <a href="?acao=delete&id=<?= $tarefa['id'] ?>">Excluir</a>
-                                </div>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </section>
-
-            <section class="lista-tarefas">
-                <h2>Tarefas fixas</h2>
-                <?php if (count($tarefasFixas) === 0): ?>
-                    <p>Nenhuma tarefa fixa cadastrada.</p>
-                <?php else: ?>
-                    <ul>
-                        <?php foreach ($tarefasFixas as $tarefa): ?>
-                            <li class="tarefa-card <?= $tarefa['status_visual'] ?>">
-                                <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
-                                    <span class="badge-atraso"><?= $tarefa['dias_atraso'] ?>d</span>
-                                <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
-                                    <span class="badge-hoje">HOJE</span>
-                                <?php endif; ?>
-                                
-                                <h3><?= htmlspecialchars($tarefa['titulo']) ?></h3>
-                                
-                                <p class="prazo-info">
-                                    Prazo: <?= date('d/m/Y', strtotime($tarefa['prazo'])) ?>
-                                </p>
-
-                                <p>Status: <?= $tarefa['status'] ?></p>
-                                
-                                <?php if ($cargoUsuario !== 'funcionario'): ?>
-                                    <div class="info-atribuicao">
-                                        <p class="info-criador">
-                                            👤 Criada por: <strong><?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?></strong>
-                                        </p>
-                                        <?php if ($tarefa['atribuida_para']): ?>
-                                            <p class="info-atribuido">
-                                                📌 Atribuída para: <strong><?= htmlspecialchars($tarefa['atribuido_nome']) ?></strong>
-                                            </p>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="observacoes-preview">
-                                    <strong>Observações:</strong>
-
-                                    <?php if (!empty($tarefa['observacoes'])): ?>
-                                        <p><?= nl2br(htmlspecialchars($tarefa['observacoes'])) ?></p>
-                                    <?php else: ?>
-                                        <p class="sem-observacoes">Nenhuma observação</p>
-                                    <?php endif; ?>
-                                </div>          
-                                
-                                <button 
-                                    type="button"
-                                    class="btn-observacoes"
-                                    data-id="<?= $tarefa['id'] ?>"
-                                    data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
-                                >
-                                    Editar observações
-                                </button>
-
-                                <div>
-                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>">
-                                        <?= $tarefa['status'] === 'pendente' ? 'Concluir' : 'Reabrir' ?>
-                                    </a>
-                                    |
-                                    <a href="?acao=delete&id=<?= $tarefa['id'] ?>">Excluir</a>
-                                </div>
-
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </section>
             
-        </div>
-
-    </div>
-</main>
-
-     <div id="modalObservacoes" class="modal hidden">
-            <div class="modal-content">
-                <h3>Observações da tarefa</h3>
-
-                <form method="POST" action="salvar_observacoes.php">
-                    <input type="hidden" name="tarefa_id" id="modalTarefaId">
-
-                    <textarea 
-                        name="observacoes" 
-                        id="modalObservacoesTexto"
-                        rows="6"
-                        placeholder="Anotações da tarefa..."
-                    ></textarea>
-
-                    <div class="modal-actions">
-                        <button type="submit">Salvar</button>
-                        <button type="button" id="fecharModal">Cancelar</button>
-                    </div>
-                </form>
+            <div class="mini-stat">
+                <div class="mini-stat-icon pending">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <div class="mini-stat-info">
+                    <span class="mini-stat-value"><?= $contadorPendentes ?></span>
+                    <span class="mini-stat-label">Pendentes</span>
+                </div>
+            </div>
+            
+            <?php if ($contadorAtrasadas > 0): ?>
+            <div class="mini-stat alert">
+                <div class="mini-stat-icon overdue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <div class="mini-stat-info">
+                    <span class="mini-stat-value"><?= $contadorAtrasadas ?></span>
+                    <span class="mini-stat-label">Atrasadas</span>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <div class="mini-stat">
+                <div class="mini-stat-icon done">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </div>
+                <div class="mini-stat-info">
+                    <span class="mini-stat-value"><?= $contadorConcluidas ?></span>
+                    <span class="mini-stat-label">Concluídas</span>
+                </div>
             </div>
         </div>
-                                   
+
+        <!-- Main Grid -->
+        <div class="tarefas-grid">
+            
+            <!-- Sidebar: Nova Tarefa -->
+            <aside class="tarefas-sidebar">
+                <div class="new-task-card">
+                    <div class="new-task-header">
+                        <div class="new-task-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </div>
+                        <h2>Nova Tarefa</h2>
+                    </div>
+
+                    <form method="POST" class="new-task-form">
+                        <div class="form-group">
+                            <label for="titulo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="17" y1="10" x2="3" y2="10"/>
+                                    <line x1="21" y1="6" x2="3" y2="6"/>
+                                    <line x1="21" y1="14" x2="3" y2="14"/>
+                                    <line x1="17" y1="18" x2="3" y2="18"/>
+                                </svg>
+                                Título
+                            </label>
+                            <input type="text" id="titulo" name="titulo" placeholder="O que precisa ser feito?" required>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="prazo">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                        <line x1="16" y1="2" x2="16" y2="6"/>
+                                        <line x1="8" y1="2" x2="8" y2="6"/>
+                                        <line x1="3" y1="10" x2="21" y2="10"/>
+                                    </svg>
+                                    Prazo
+                                </label>
+                                <input type="date" id="prazo" name="prazo" required min="<?= date('Y-m-d') ?>">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="tipo">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                                        <polyline points="2 17 12 22 22 17"/>
+                                        <polyline points="2 12 12 17 22 12"/>
+                                    </svg>
+                                    Tipo
+                                </label>
+                                <select id="tipo" name="tipo">
+                                    <option value="normal">Única</option>
+                                    <option value="fixa">Recorrente</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <?php if (!empty($usuariosDisponiveis)): ?>
+                            <div class="form-group">
+                                <label for="atribuida_para">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                        <circle cx="12" cy="7" r="4"/>
+                                    </svg>
+                                    Atribuir para
+                                </label>
+                                <select id="atribuida_para" name="atribuida_para">
+                                    <option value="">Eu mesmo</option>
+                                    <?php foreach ($usuariosDisponiveis as $usuario): ?>
+                                        <option value="<?= $usuario['id'] ?>">
+                                            <?= htmlspecialchars($usuario['nome']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
+
+                        <button type="submit" class="btn-create-task">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Criar Tarefa
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Quick Tips -->
+                <div class="tips-card">
+                    <h3>💡 Dica</h3>
+                    <p>Tarefas <strong>recorrentes</strong> se renovam automaticamente todo mês no mesmo dia.</p>
+                </div>
+            </aside>
+
+            <!-- Main Content: Lista de Tarefas -->
+            <div class="tarefas-main">
+                
+                <!-- Tarefas Normais -->
+                <section class="tasks-section">
+                    <div class="section-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                <line x1="9" y1="12" x2="15" y2="12"/>
+                                <line x1="9" y1="16" x2="15" y2="16"/>
+                            </svg>
+                            Tarefas
+                        </h2>
+                        <span class="section-count"><?= count($tarefasNormais) ?></span>
+                    </div>
+                    
+                    <?php if (count($tarefasNormais) === 0): ?>
+                        <div class="empty-tasks">
+                            <div class="empty-illustration">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                    <path d="M9 14l2 2 4-4"/>
+                                </svg>
+                            </div>
+                            <p>Nenhuma tarefa cadastrada</p>
+                            <span>Crie sua primeira tarefa ao lado!</span>
+                        </div>
+                    <?php else: ?>
+                        <div class="tasks-list">
+                            <?php foreach ($tarefasNormais as $tarefa): ?>
+                                <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                    <!-- Checkbox -->
+                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                        <?php if ($tarefa['status'] === 'concluida'): ?>
+                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                            </svg>
+                                        <?php else: ?>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"/>
+                                            </svg>
+                                        <?php endif; ?>
+                                    </a>
+                                    
+                                    <!-- Content -->
+                                    <div class="task-content">
+                                        <div class="task-header">
+                                            <h3 class="task-title"><?= htmlspecialchars($tarefa['titulo']) ?></h3>
+                                            <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                                <span class="task-badge overdue">
+                                                    <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
+                                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                                                    </svg>
+                                                    <?= $tarefa['dias_atraso'] ?>d
+                                                </span>
+                                            <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                                <span class="task-badge today">Hoje</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <div class="task-meta">
+                                            <span class="task-date <?= $tarefa['status_visual'] ?>">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                                </svg>
+                                                <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
+                                            </span>
+                                            
+                                            <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                <!-- Criador da tarefa -->
+                                                <span class="task-creator">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                                        <circle cx="12" cy="7" r="4"/>
+                                                    </svg>
+                                                    <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
+                                                </span>
+                                                
+                                                <!-- Atribuído para (se diferente do criador) -->
+                                                <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
+                                                    <span class="task-assignee">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M22 2L11 13"/>
+                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                                        </svg>
+                                                        → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <?php if (!empty($tarefa['observacoes'])): ?>
+                                            <div class="task-notes">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                                </svg>
+                                                <span><?= htmlspecialchars(substr($tarefa['observacoes'], 0, 60)) ?><?= strlen($tarefa['observacoes']) > 60 ? '...' : '' ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <!-- Actions -->
+                                    <div class="task-actions">
+                                        <button 
+                                            type="button"
+                                            class="action-btn btn-observacoes"
+                                            data-id="<?= $tarefa['id'] ?>"
+                                            data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                            title="Observações"
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                            </svg>
+                                        </button>
+                                        <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"/>
+                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Tarefas Fixas -->
+                <section class="tasks-section recurring">
+                    <div class="section-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <polyline points="1 20 1 14 7 14"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            Tarefas Recorrentes
+                        </h2>
+                        <span class="section-count"><?= count($tarefasFixas) ?></span>
+                    </div>
+                    
+                    <?php if (count($tarefasFixas) === 0): ?>
+                        <div class="empty-tasks compact">
+                            <p>Nenhuma tarefa recorrente</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="tasks-list">
+                            <?php foreach ($tarefasFixas as $tarefa): ?>
+                                <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                    <!-- Checkbox -->
+                                    <a href="?acao=toggle&id=<?= $tarefa['id'] ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                        <?php if ($tarefa['status'] === 'concluida'): ?>
+                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                            </svg>
+                                        <?php else: ?>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"/>
+                                            </svg>
+                                        <?php endif; ?>
+                                    </a>
+                                    
+                                    <!-- Content -->
+                                    <div class="task-content">
+                                        <div class="task-header">
+                                            <h3 class="task-title">
+                                                <?= htmlspecialchars($tarefa['titulo']) ?>
+                                                <span class="recurring-badge">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                                        <polyline points="23 4 23 10 17 10"/>
+                                                        <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+                                                    </svg>
+                                                </span>
+                                            </h3>
+                                            <?php if ($tarefa['status_visual'] === 'atrasada'): ?>
+                                                <span class="task-badge overdue">
+                                                    <?= $tarefa['dias_atraso'] ?>d
+                                                </span>
+                                            <?php elseif ($tarefa['status_visual'] === 'hoje'): ?>
+                                                <span class="task-badge today">Hoje</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <div class="task-meta">
+                                            <span class="task-date <?= $tarefa['status_visual'] ?>">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                                </svg>
+                                                <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
+                                            </span>
+                                            
+                                            <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                <span class="task-creator">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                                        <circle cx="12" cy="7" r="4"/>
+                                                    </svg>
+                                                    <?= htmlspecialchars($tarefa['criador_nome'] ?? 'Desconhecido') ?>
+                                                </span>
+                                                
+                                                <?php if ($tarefa['atribuida_para'] && $tarefa['atribuida_para'] != $tarefa['usuario_id']): ?>
+                                                    <span class="task-assignee">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M22 2L11 13"/>
+                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                                        </svg>
+                                                        → <?= htmlspecialchars($tarefa['atribuido_nome']) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Actions -->
+                                    <div class="task-actions">
+                                        <button 
+                                            type="button"
+                                            class="action-btn btn-observacoes"
+                                            data-id="<?= $tarefa['id'] ?>"
+                                            data-observacoes="<?= htmlspecialchars($tarefa['observacoes'] ?? '', ENT_QUOTES) ?>"
+                                            title="Observações"
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                            </svg>
+                                        </button>
+                                        <a href="?acao=delete&id=<?= $tarefa['id'] ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"/>
+                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal de Observações -->
+    <div id="modalObservacoes" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    Observações
+                </h3>
+                <button type="button" id="fecharModal" class="modal-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="salvar_observacoes.php">
+                <input type="hidden" name="tarefa_id" id="modalTarefaId">
+
+                <textarea 
+                    name="observacoes" 
+                    id="modalObservacoesTexto"
+                    rows="6"
+                    placeholder="Adicione suas anotações aqui..."
+                ></textarea>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelarModal" class="btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn-save">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script src="assets/js/main.js"></script>
-
 </body>
 </html>

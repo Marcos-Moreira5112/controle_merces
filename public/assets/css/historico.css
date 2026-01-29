@@ -1,0 +1,629 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   HISTÓRICO DE TAREFAS - TaskBlue
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Container Principal */
+.historico-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+/* Cabeçalho da Seção */
+.historico-header {
+    margin-bottom: 2rem;
+}
+
+.historico-titulo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.historico-titulo h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--azul-marinho);
+    margin: 0;
+}
+
+.historico-titulo .contador {
+    background: var(--azul-marinho);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.aviso-expiracao {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: var(--radius-md);
+    color: #92400e;
+    font-size: 0.9rem;
+}
+
+.aviso-expiracao svg {
+    flex-shrink: 0;
+    color: #d97706;
+}
+
+.aviso-expiracao strong {
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMPTY STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.empty-icon {
+    margin-bottom: 1.5rem;
+}
+
+.empty-icon svg {
+    color: #cbd5e1;
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--azul-marinho);
+    margin: 0 0 0.5rem 0;
+}
+
+.empty-state p {
+    color: var(--cinza-secundario);
+    max-width: 400px;
+    margin: 0 auto 1.5rem auto;
+    line-height: 1.6;
+}
+
+.btn-voltar-tarefas {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, var(--laranja), #e65100);
+    color: white;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-voltar-tarefas:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 124, 0, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRUPOS DE DATA
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.historico-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.grupo-data {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.grupo-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.grupo-titulo {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cinza-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.grupo-linha {
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.grupo-tarefas {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CARDS DE TAREFA ARQUIVADA
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tarefa-arquivada {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: all 0.2s;
+    border-left: 4px solid #94a3b8;
+}
+
+.tarefa-arquivada:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.tarefa-arquivada.alerta {
+    border-left-color: #f59e0b;
+    background: linear-gradient(135deg, white 0%, #fffbeb 100%);
+}
+
+.tarefa-arquivada.critico {
+    border-left-color: #ef4444;
+    background: linear-gradient(135deg, white 0%, #fef2f2 100%);
+}
+
+.tarefa-main {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.25rem 1.5rem;
+}
+
+.tarefa-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tarefa-titulo {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--azul-marinho);
+    margin: 0 0 0.75rem 0;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.tarefa-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--cinza-secundario);
+}
+
+.meta-item svg {
+    flex-shrink: 0;
+}
+
+.meta-item.usuario {
+    background: #f1f5f9;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+/* Badges de Status e Tipo */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-status.concluida {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-status.pendente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-tipo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.6rem;
+    background: #e0e7ff;
+    color: #3730a3;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Observações */
+.tarefa-observacoes {
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: var(--radius-sm);
+    margin-top: 0.5rem;
+}
+
+.tarefa-observacoes p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--cinza-secundario);
+    line-height: 1.5;
+}
+
+/* Expiração */
+.tarefa-expiracao {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.expiracao-info {
+    text-align: center;
+    min-width: 100px;
+}
+
+.expiracao-texto {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--cinza-secundario);
+    margin-bottom: 0.5rem;
+}
+
+.expiracao-info.alerta .expiracao-texto {
+    color: #d97706;
+}
+
+.expiracao-info.critico .expiracao-texto {
+    color: #dc2626;
+}
+
+.expiracao-barra {
+    width: 100%;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.expiracao-progresso {
+    height: 100%;
+    background: #94a3b8;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.expiracao-info.alerta .expiracao-progresso {
+    background: #f59e0b;
+}
+
+.expiracao-info.critico .expiracao-progresso {
+    background: #ef4444;
+}
+
+/* Ações */
+.tarefa-acoes {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #f8fafc;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn-restaurar,
+.btn-excluir {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    border: none;
+    font-family: inherit;
+}
+
+.btn-restaurar {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.btn-restaurar:hover {
+    background: #d1fae5;
+}
+
+.btn-excluir {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.btn-excluir:hover {
+    background: #fee2e2;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODAL DE CONFIRMAÇÃO
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+}
+
+.modal-overlay.ativo {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-confirmacao {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.2s;
+}
+
+.modal-overlay.ativo .modal-confirmacao {
+    transform: scale(1);
+}
+
+.modal-icon {
+    margin-bottom: 1rem;
+}
+
+.modal-icon svg {
+    color: #f59e0b;
+}
+
+.modal-confirmacao h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--azul-marinho);
+    margin: 0 0 0.75rem 0;
+}
+
+.modal-confirmacao p {
+    color: var(--cinza-secundario);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.5;
+}
+
+.modal-confirmacao #modal-tarefa-nome {
+    font-weight: 600;
+    color: var(--cinza-texto);
+}
+
+.modal-acoes {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.btn-cancelar,
+.btn-confirmar-excluir {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    text-decoration: none;
+    font-family: inherit;
+}
+
+.btn-cancelar {
+    background: #f1f5f9;
+    color: var(--cinza-texto);
+}
+
+.btn-cancelar:hover {
+    background: #e2e8f0;
+}
+
+.btn-confirmar-excluir {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.btn-confirmar-excluir:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MENSAGEM TOAST
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mensagem-toast {
+    position: fixed;
+    top: 100px;
+    right: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    z-index: 999;
+    animation: slideIn 0.3s ease;
+    box-shadow: var(--shadow-lg);
+}
+
+.mensagem-toast.sucesso {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.mensagem-toast.erro {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.mensagem-toast.fade-out {
+    animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .historico-container {
+        padding: 0 1rem;
+        margin: 1rem auto;
+    }
+    
+    .historico-titulo {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .tarefa-main {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .tarefa-expiracao {
+        width: 100%;
+    }
+    
+    .expiracao-info {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .expiracao-texto {
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+    
+    .expiracao-barra {
+        flex: 1;
+    }
+    
+    .tarefa-acoes {
+        flex-direction: column;
+    }
+    
+    .btn-restaurar,
+    .btn-excluir {
+        justify-content: center;
+    }
+    
+    .mensagem-toast {
+        left: 1rem;
+        right: 1rem;
+        top: auto;
+        bottom: 1.5rem;
+    }
+    
+    .modal-acoes {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .tarefa-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .aviso-expiracao {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOTÕES DE NAVEGAÇÃO DO HEADER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.header-actions .btn-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.header-actions .btn-nav:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.header-actions .btn-nav svg {
+    flex-shrink: 0;
+}
