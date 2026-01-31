@@ -1281,3 +1281,276 @@ header .header-actions .btn-logout {
         line-height: normal;
     }
 }
+
+/* ===== FIX: Reset específico para action-btn ===== */
+button.action-btn {
+    all: unset;
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+button.action-btn svg,
+a.action-btn svg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    color: var(--cinza-secundario);
+}
+
+a.action-btn {
+    position: relative;
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+button.action-btn:hover,
+a.action-btn:hover {
+    border-color: var(--laranja);
+    background: #fff7ed;
+}
+
+button.action-btn:hover svg,
+a.action-btn:hover svg {
+    color: var(--laranja);
+}
+
+a.action-btn.btn-delete:hover {
+    border-color: var(--vermelho);
+    background: #fef2f2;
+}
+
+a.action-btn.btn-delete:hover svg {
+    color: var(--vermelho);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOAST DE DESFAZER (Estilo Gmail)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.toast-desfazer {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001;
+    animation: toastSlideUp 0.3s ease;
+}
+
+.toast-desfazer.hidden {
+    display: none;
+}
+
+.toast-desfazer-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #323232;
+    color: white;
+    padding: 0.875rem 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.toast-desfazer-content svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.toast-desfazer-content span {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.btn-desfazer {
+    background: transparent;
+    border: none;
+    color: #8ab4f8;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    margin-left: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-desfazer:hover {
+    background: rgba(138, 180, 248, 0.15);
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #8ab4f8;
+    animation: progressShrink 5s linear forwards;
+}
+
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes progressShrink {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+
+/* Esconder item arquivado com animação */
+.task-item.arquivando {
+    animation: taskFadeOut 0.3s ease forwards;
+}
+
+@keyframes taskFadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(20px);
+        height: 0;
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOTÕES DE DATA RÁPIDA
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.date-shortcuts {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.date-shortcut-btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: #f1f5f9;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--cinza-secundario);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.date-shortcut-btn:hover {
+    background: #e2e8f0;
+    color: var(--cinza-texto);
+}
+
+.date-shortcut-btn.active {
+    background: #fff7ed;
+    border-color: var(--laranja);
+    color: var(--laranja);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SELECT DE FILTRO (Usuário e Ordenação)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.filtro-select {
+    height: 32px;
+    padding: 0 0.75rem;
+    padding-right: 2rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--cinza-texto);
+    cursor: pointer;
+    transition: all 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+}
+
+.filtro-select:hover {
+    border-color: #cbd5e1;
+}
+
+.filtro-select:focus {
+    outline: none;
+    border-color: var(--laranja);
+    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJUSTES RESPONSIVOS PARA NOVOS ELEMENTOS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+    .filtros-bar .filtros-grupo {
+        width: 100%;
+    }
+    
+    .filtro-select {
+        flex: 1;
+        min-width: 150px;
+    }
+}
+
+@media (max-width: 640px) {
+    .date-shortcuts {
+        flex-wrap: wrap;
+    }
+    
+    .date-shortcut-btn {
+        flex: 1 1 calc(33.333% - 0.5rem);
+        min-width: 70px;
+    }
+    
+    .toast-desfazer {
+        left: 16px;
+        right: 16px;
+        transform: none;
+    }
+    
+    .toast-desfazer-content {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .btn-desfazer {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 0.5rem;
+    }
+}

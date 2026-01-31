@@ -15,15 +15,18 @@ require_once ROOT_PATH . '/config/conexao.php';
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar cargo do usuário logado
-$sqlUsuario = "SELECT cargo FROM usuarios WHERE id = :usuario_id";
+// Buscar dados do usuário logado
+$sqlUsuario = "SELECT nome, cargo FROM usuarios WHERE id = :usuario_id";
 $stmtUsuario = $pdo->prepare($sqlUsuario);
 $stmtUsuario->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
 $stmtUsuario->execute();
 $usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
 
+$nomeUsuario = $usuarioLogado['nome'];
+$cargoUsuario = $usuarioLogado['cargo'];
+
 // Só administrador pode acessar
-if ($usuarioLogado['cargo'] !== 'administrador') {
+if ($cargoUsuario !== 'administrador') {
     $_SESSION['mensagem'] = 'Você não tem permissão para acessar esta página.';
     $_SESSION['tipo_mensagem'] = 'erro';
     header('Location: tarefas.php');
@@ -35,26 +38,53 @@ $mensagem = $_SESSION['mensagem'] ?? null;
 $tipo_mensagem = $_SESSION['tipo_mensagem'] ?? null;
 unset($_SESSION['mensagem'], $_SESSION['tipo_mensagem']);
 
-// Gerar senha aleatória
-function gerarSenha($tamanho = 10) {
-    $caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
-    $senha = '';
-    for ($i = 0; $i < $tamanho; $i++) {
-        $senha .= $caracteres[random_int(0, strlen($caracteres) - 1)];
-    }
-    return $senha;
-}
-
 // Processar ações POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
-    if ($acao === 'criar' || $acao === 'editar') {
+    if ($acao === 'criar') {
         $nome = trim($_POST['nome'] ?? '');
         $email = trim($_POST['email'] ?? '');
+        $senha = $_POST['senha'] ?? '';
         $cargo = $_POST['cargo'] ?? 'funcionario';
         $supervisor_id = !empty($_POST['supervisor_id']) ? (int)$_POST['supervisor_id'] : null;
-        $id = isset($_POST['id']) ? (int)$_POST['id'] : null;
+
+        if ($cargo !== 'funcionario') {
+            $supervisor_id = null;
+        }
+
+        if ($nome === '' || $email === '' || $senha === '') {
+            $_SESSION['mensagem'] = 'Nome, e-mail e senha são obrigatórios!';
+            $_SESSION['tipo_mensagem'] = 'erro';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['mensagem'] = 'E-mail inválido!';
+            $_SESSION['tipo_mensagem'] = 'erro';
+        } elseif (strlen($senha) < 6) {
+            $_SESSION['mensagem'] = 'A senha deve ter pelo menos 6 caracteres!';
+            $_SESSION['tipo_mensagem'] = 'erro';
+        } else {
+            $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
+            
+            $sql = "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo) 
+                    VALUES (:nome, :email, :senha, :cargo, :supervisor_id, 1)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindParam(':nome', $nome);
+            $stmt->bindParam(':email', $email);
+            $stmt->bindParam(':senha', $senhaHash);
+            $stmt->bindParam(':cargo', $cargo);
+            $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $_SESSION['mensagem'] = 'Usuário criado com sucesso!';
+            $_SESSION['tipo_mensagem'] = 'sucesso';
+        }
+    } elseif ($acao === 'editar') {
+        $id = (int)$_POST['id'];
+        $nome = trim($_POST['nome'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $novaSenha = $_POST['nova_senha'] ?? '';
+        $cargo = $_POST['cargo'] ?? 'funcionario';
+        $supervisor_id = !empty($_POST['supervisor_id']) ? (int)$_POST['supervisor_id'] : null;
 
         if ($cargo !== 'funcionario') {
             $supervisor_id = null;
@@ -66,49 +96,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['mensagem'] = 'E-mail inválido!';
             $_SESSION['tipo_mensagem'] = 'erro';
+        } elseif ($novaSenha !== '' && strlen($novaSenha) < 6) {
+            $_SESSION['mensagem'] = 'A nova senha deve ter pelo menos 6 caracteres!';
+            $_SESSION['tipo_mensagem'] = 'erro';
         } else {
-            if ($acao === 'criar') {
-                // Gera senha legível e depois faz o hash para salvar
-                $senhaLegivel = gerarSenha(10);
-                $senhaHash = password_hash($senhaLegivel, PASSWORD_DEFAULT);
-                
-                $sql = "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo) 
-                        VALUES (:nome, :email, :senha, :cargo, :supervisor_id, 1)";
+            if ($novaSenha !== '') {
+                $senhaHash = password_hash($novaSenha, PASSWORD_DEFAULT);
+                $sql = "UPDATE usuarios SET nome = :nome, email = :email, senha = :senha, cargo = :cargo, supervisor_id = :supervisor_id WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
-                $stmt->bindParam(':senha', $senhaHash); // Salva o HASH, não a senha
-                $mensagemExtra = " Senha gerada: <strong>$senhaLegivel</strong> (anote e informe ao usuário!)";
+                $stmt->bindParam(':senha', $senhaHash);
             } else {
-                $sql = "UPDATE usuarios SET nome = :nome, email = :email, cargo = :cargo, supervisor_id = :supervisor_id 
-                        WHERE id = :id";
+                $sql = "UPDATE usuarios SET nome = :nome, email = :email, cargo = :cargo, supervisor_id = :supervisor_id WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
-                $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-                $mensagemExtra = '';
             }
-
+            
             $stmt->bindParam(':nome', $nome);
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':cargo', $cargo);
-            $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT | PDO::PARAM_NULL);
+            $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT);
+            $stmt->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
 
-            $_SESSION['mensagem'] = ($acao === 'criar' ? 'Usuário criado com sucesso!' : 'Usuário atualizado!') . ($mensagemExtra ?? '');
+            $_SESSION['mensagem'] = 'Usuário atualizado com sucesso!';
             $_SESSION['tipo_mensagem'] = 'sucesso';
         }
-    } elseif ($acao === 'reset_senha') {
-        $id = (int)$_POST['id'];
-        
-        // Gera senha legível e depois faz o hash para salvar
-        $senhaLegivel = gerarSenha(10);
-        $senhaHash = password_hash($senhaLegivel, PASSWORD_DEFAULT);
-        
-        $sql = "UPDATE usuarios SET senha = :senha WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':senha', $senhaHash); // Salva o HASH
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        $stmt->execute();
-
-        $_SESSION['mensagem'] = "Senha resetada! Nova senha: <strong>$senhaLegivel</strong> (entregue ao usuário!)";
-        $_SESSION['tipo_mensagem'] = 'sucesso';
     } elseif ($acao === 'toggle_ativo') {
         $id = (int)$_POST['id'];
         $novoAtivo = (int)$_POST['novo_ativo'];
@@ -156,54 +167,85 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Gerenciar Usuários | Óticas Mercês</title>
+    <title>Gerenciar Usuários | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <header>
         <div class="header-content">
             <div>
-                <h1>Gerenciar Usuários</h1>
-                <p>Óticas Mercês - Controle interno</p>
+                <h1>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                    </svg>
+                    Usuários
+                </h1>
+                <p>Óticas Mercês • <?= htmlspecialchars($nomeUsuario) ?>
+                    <span class="badge-cargo <?= $cargoUsuario ?>"><?= ucfirst($cargoUsuario) ?></span>
+                </p>
             </div>
             <div class="header-actions">
-                <a href="dashboard.php" class="btn-gerenciar">🏠 Dashboard</a>
-            </div>            
-            <div class="header-actions">
-                <a href="tarefas.php" class="btn-voltar">← Voltar para Tarefas</a>
-                <a href="logout.php" class="btn-logout">Sair</a>
+                <a href="dashboard.php" class="btn-nav">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="tarefas.php" class="btn-nav">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                        <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    </svg>
+                    Tarefas
+                </a>
+                <a href="historico.php" class="btn-nav">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Histórico
+                </a>
+                <a href="logout.php" class="btn-logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Sair
+                </a>
             </div>
         </div>
     </header>
 
     <main class="user-management-container">
 
-        <!-- Mensagem de feedback -->
         <?php if ($mensagem): ?>
             <div class="mensagem <?= $tipo_mensagem ?>">
                 <?= $mensagem ?>
             </div>
         <?php endif; ?>
 
-        <!-- Cabeçalho -->
         <div class="page-header">
-            <h1>Gerenciamento de Usuários</h1>
+            <h2>Gerenciamento de Usuários</h2>
             <p>Controle acessos, cargos e hierarquia da equipe.</p>
         </div>
 
-        <!-- Barra de busca + botão -->
         <div class="controls-bar">
             <form method="GET" class="flex-1">
                 <input type="text" name="busca" class="search-input" placeholder="Buscar por nome, e-mail ou cargo..." value="<?= htmlspecialchars($busca) ?>">
             </form>
-            <button onclick="abrirModal('modalCriar')" class="btn-add">
+            <button type="button" onclick="abrirModal('modalCriar')" class="btn-add">
                 <span class="plus">+</span> Novo Usuário
             </button>
         </div>
 
-        <!-- Tabela -->
         <div class="table-container">
             <table class="user-table">
                 <thead>
@@ -256,34 +298,30 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
                             </td>
                             <td>
                                 <div class="actions">
-                                    <button class="action-btn" title="Editar" onclick="abrirEditar(<?= $user['id'] ?>, '<?= addslashes($user['nome']) ?>', '<?= addslashes($user['email']) ?>', '<?= $user['cargo'] ?>', <?= $user['supervisor_id'] ?? 'null' ?>)">
-                                        <svg class="icon-action" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                    <button type="button" class="action-btn" title="Editar" onclick="abrirEditar(<?= $user['id'] ?>, '<?= addslashes($user['nome']) ?>', '<?= addslashes($user['email']) ?>', '<?= $user['cargo'] ?>', <?= $user['supervisor_id'] ?? 'null' ?>)">
+                                        <svg class="icon-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                         </svg>
                                     </button>
 
-                                    <form method="POST" style="display: inline;">
-                                        <input type="hidden" name="acao" value="reset_senha">
-                                        <input type="hidden" name="id" value="<?= $user['id'] ?>">
-                                        <button type="submit" class="action-btn" title="Resetar Senha" onclick="return confirm('Resetar senha de <?= addslashes($user['nome']) ?>?')">
-                                            <svg class="icon-action" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25l-2.25 2.25-1.5-1.5L6 18.75l-2.25-2.25L3.75 15l1.5-1.5L5.25 12l2.25-2.25c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-                                            </svg>
-                                        </button>
-                                    </form>
-
-                                    <form method="POST" style="display: inline;">
+                                    <form method="POST">
                                         <input type="hidden" name="acao" value="toggle_ativo">
                                         <input type="hidden" name="id" value="<?= $user['id'] ?>">
                                         <input type="hidden" name="novo_ativo" value="<?= $user['ativo'] ? 0 : 1 ?>">
                                         <button type="submit" class="action-btn" title="<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?>" onclick="return confirm('<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?> <?= addslashes($user['nome']) ?>?')">
                                             <?php if ($user['ativo']): ?>
-                                                <svg class="icon-action" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                                                <svg class="icon-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                                                    <circle cx="9" cy="7" r="4"/>
+                                                    <line x1="23" y1="11" x2="17" y2="11"/>
                                                 </svg>
                                             <?php else: ?>
-                                                <svg class="icon-action" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                                                <svg class="icon-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                                                    <circle cx="9" cy="7" r="4"/>
+                                                    <line x1="17" y1="11" x2="23" y2="11"/>
+                                                    <line x1="20" y1="8" x2="20" y2="14"/>
                                                 </svg>
                                             <?php endif; ?>
                                         </button>
@@ -310,6 +348,9 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
 
                 <label>E-mail</label>
                 <input type="email" name="email" required>
+
+                <label>Senha</label>
+                <input type="password" name="senha" required minlength="6" placeholder="Mínimo 6 caracteres">
 
                 <label>Cargo</label>
                 <select name="cargo" id="cargoCriar" onchange="toggleSupervisor('cargoCriar', 'divSupervisorCriar')">
@@ -349,6 +390,9 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
 
                 <label>E-mail</label>
                 <input type="email" name="email" id="editEmail" required>
+
+                <label>Nova Senha <small style="color: #666; font-weight: normal;">(deixe em branco para manter a atual)</small></label>
+                <input type="password" name="nova_senha" id="editSenha" minlength="6" placeholder="Mínimo 6 caracteres">
 
                 <label>Cargo</label>
                 <select name="cargo" id="editCargo" onchange="toggleSupervisor('editCargo', 'divSupervisorEdit')">
@@ -400,6 +444,7 @@ $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('editId').value = id;
             document.getElementById('editNome').value = nome;
             document.getElementById('editEmail').value = email;
+            document.getElementById('editSenha').value = '';
             document.getElementById('editCargo').value = cargo;
             
             if (supervisorId) {

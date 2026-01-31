@@ -188,16 +188,19 @@
 
 .input-wrapper {
     position: relative;
+    height: 52px; /* ADICIONA ISSO */
 }
 
 .input-wrapper input {
+    height: 100%; /* MUDA PARA ISSO */
     width: 100%;
-    padding: 1rem 1rem 1rem 3rem;
+    padding: 0 1rem 0 3rem;
     border: 2px solid #e5e7eb;
     border-radius: 12px;
     font-size: 1rem;
     transition: all 0.2s;
     background: #f8fafc;
+    box-sizing: border-box;
 }
 
 .input-wrapper input:focus {

@@ -30,11 +30,72 @@ $cargoUsuario = $usuarioLogado['cargo'];
 $nomeUsuario = $usuarioLogado['nome'];
 
 // ═══════════════════════════════════════════════════════════════
+// DICAS ROTATIVAS
+// ═══════════════════════════════════════════════════════════════
+$dicas = [
+    [
+        'icone' => '💡',
+        'titulo' => 'Filtros rápidos',
+        'texto' => 'Use os <strong>filtros</strong> acima para encontrar tarefas rapidamente por status ou tipo.'
+    ],
+    [
+        'icone' => '🔄',
+        'titulo' => 'Tarefas recorrentes',
+        'texto' => 'Tarefas <strong>recorrentes</strong> se renovam automaticamente todo mês após o prazo.'
+    ],
+    [
+        'icone' => '✅',
+        'titulo' => 'Marcar como concluída',
+        'texto' => 'Clique no <strong>círculo</strong> ao lado da tarefa para marcá-la como concluída.'
+    ],
+    [
+        'icone' => '📝',
+        'titulo' => 'Observações',
+        'texto' => 'Use o botão de <strong>editar</strong> para adicionar observações importantes às tarefas.'
+    ],
+    [
+        'icone' => '📅',
+        'titulo' => 'Atalhos de data',
+        'texto' => 'Use os botões <strong>Hoje</strong>, <strong>Amanhã</strong> ou <strong>+7 dias</strong> para definir prazos rapidamente.'
+    ],
+    [
+        'icone' => '🗂️',
+        'titulo' => 'Histórico',
+        'texto' => 'Tarefas arquivadas vão para o <strong>Histórico</strong>, onde podem ser restauradas ou excluídas.'
+    ],
+    [
+        'icone' => '↩️',
+        'titulo' => 'Desfazer exclusão',
+        'texto' => 'Arquivou sem querer? Clique em <strong>Desfazer</strong> no aviso que aparece para recuperar a tarefa.'
+    ],
+    [
+        'icone' => '🔍',
+        'titulo' => 'Busca inteligente',
+        'texto' => 'Digite qualquer parte do <strong>título</strong> da tarefa na busca para encontrá-la rapidamente.'
+    ],
+    [
+        'icone' => '👥',
+        'titulo' => 'Atribuir tarefas',
+        'texto' => 'Supervisores podem <strong>atribuir tarefas</strong> para seus funcionários no formulário de criação.'
+    ],
+    [
+        'icone' => '📊',
+        'titulo' => 'Ordenação',
+        'texto' => 'Use a <strong>ordenação</strong> para ver primeiro as tarefas mais urgentes ou mais recentes.'
+    ]
+];
+
+// Seleciona uma dica aleatória
+$dicaAtual = $dicas[array_rand($dicas)];
+
+// ═══════════════════════════════════════════════════════════════
 // FILTROS E BUSCA
 // ═══════════════════════════════════════════════════════════════
 $filtro_busca = trim($_GET['busca'] ?? '');
 $filtro_status = $_GET['status'] ?? 'todos';
 $filtro_tipo = $_GET['tipo'] ?? 'todos';
+$filtro_usuario = $_GET['usuario'] ?? 'todos';
+$ordenar_por = $_GET['ordenar'] ?? 'vencimento_asc';
 
 // Buscar lista de usuários para atribuição de tarefas (só admin e supervisor veem)
 $usuariosDisponiveis = [];
@@ -55,6 +116,33 @@ if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
     $stmtUsuarios->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmtUsuarios->execute();
     $usuariosDisponiveis = $stmtUsuarios->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Buscar lista de usuários para FILTRO (diferente da atribuição)
+$usuariosFiltro = [];
+if ($cargoUsuario === 'administrador') {
+    // Admin vê todos os usuários
+    $sqlFiltroUsuarios = "
+        SELECT id, nome, cargo 
+        FROM usuarios 
+        ORDER BY cargo, nome ASC
+    ";
+    $stmtFiltroUsuarios = $pdo->prepare($sqlFiltroUsuarios);
+    $stmtFiltroUsuarios->execute();
+    $usuariosFiltro = $stmtFiltroUsuarios->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($cargoUsuario === 'supervisor') {
+    // Supervisor vê ele mesmo + seus funcionários
+    $sqlFiltroUsuarios = "
+        SELECT id, nome, cargo 
+        FROM usuarios 
+        WHERE id = :usuario_id OR supervisor_id = :usuario_id2
+        ORDER BY cargo DESC, nome ASC
+    ";
+    $stmtFiltroUsuarios = $pdo->prepare($sqlFiltroUsuarios);
+    $stmtFiltroUsuarios->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmtFiltroUsuarios->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
+    $stmtFiltroUsuarios->execute();
+    $usuariosFiltro = $stmtFiltroUsuarios->fetchAll(PDO::FETCH_ASSOC);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -97,56 +185,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $tarefa_id = (int) $_GET['id'];
 
-    $sqlUpdate = "
-        UPDATE tarefas
-        SET status = CASE 
-            WHEN status != 'concluida' THEN 'concluida'
-            ELSE 'pendente'
-        END
-        WHERE id = :id AND usuario_id = :usuario_id
-    ";
+    // Verificar se o usuário tem permissão para alterar esta tarefa
+    $sqlCheck = "SELECT usuario_id, atribuida_para FROM tarefas WHERE id = :id";
+    $stmtCheck = $pdo->prepare($sqlCheck);
+    $stmtCheck->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
+    $stmtCheck->execute();
+    $tarefaCheck = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-    $stmtUpdate = $pdo->prepare($sqlUpdate);
-    $stmtUpdate->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
-    $stmtUpdate->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmtUpdate->execute();
+    $podeAlterar = false;
+    if ($cargoUsuario === 'administrador') {
+        $podeAlterar = true;
+    } elseif ($tarefaCheck['usuario_id'] == $usuario_id || $tarefaCheck['atribuida_para'] == $usuario_id) {
+        $podeAlterar = true;
+    }
 
-    $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
-    $_SESSION['tipo_mensagem'] = 'sucesso';
+    if ($podeAlterar) {
+        $sqlUpdate = "
+            UPDATE tarefas
+            SET status = CASE 
+                WHEN status != 'concluida' THEN 'concluida'
+                ELSE 'pendente'
+            END
+            WHERE id = :id
+        ";
 
-    // Preservar filtros ao redirecionar
-    $params = http_build_query([
-        'busca' => $filtro_busca,
-        'status' => $filtro_status,
-        'tipo' => $filtro_tipo
-    ]);
-    header('Location: tarefas.php?' . $params);
-    exit;
-}
+        $stmtUpdate = $pdo->prepare($sqlUpdate);
+        $stmtUpdate->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
+        $stmtUpdate->execute();
 
-// ARQUIVAR
-if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'delete') {
-    $tarefa_id = (int) $_GET['id'];
-
-    $sqlArquivar = "
-        UPDATE tarefas
-        SET arquivada = 1, data_arquivamento = NOW()
-        WHERE id = :id AND usuario_id = :usuario_id
-    ";
-
-    $stmtArquivar = $pdo->prepare($sqlArquivar);
-    $stmtArquivar->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
-    $stmtArquivar->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmtArquivar->execute();
-
-    $_SESSION['mensagem'] = 'Tarefa movida para o histórico!';
-    $_SESSION['tipo_mensagem'] = 'sucesso';
+        $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
+        $_SESSION['tipo_mensagem'] = 'sucesso';
+    }
 
     // Preservar filtros ao redirecionar
     $params = http_build_query([
         'busca' => $filtro_busca,
         'status' => $filtro_status,
-        'tipo' => $filtro_tipo
+        'tipo' => $filtro_tipo,
+        'usuario' => $filtro_usuario,
+        'ordenar' => $ordenar_por
     ]);
     header('Location: tarefas.php?' . $params);
     exit;
@@ -253,6 +330,30 @@ if ($filtro_status === 'pendente') {
     $where_extra .= " AND t.status = 'concluida'";
 }
 
+// Filtro por usuário específico
+if ($filtro_usuario !== 'todos' && is_numeric($filtro_usuario)) {
+    $where_extra .= " AND (t.usuario_id = :filtro_usuario_id OR t.atribuida_para = :filtro_usuario_id2)";
+    $params[':filtro_usuario_id'] = (int)$filtro_usuario;
+    $params[':filtro_usuario_id2'] = (int)$filtro_usuario;
+}
+
+// Definir ordenação SQL
+$ordem_sql = "t.prazo ASC"; // padrão
+switch ($ordenar_por) {
+    case 'vencimento_asc':
+        $ordem_sql = "t.prazo ASC";
+        break;
+    case 'vencimento_desc':
+        $ordem_sql = "t.prazo DESC";
+        break;
+    case 'criacao_asc':
+        $ordem_sql = "t.id ASC";
+        break;
+    case 'criacao_desc':
+        $ordem_sql = "t.id DESC";
+        break;
+}
+
 // Montar query baseada no cargo do usuário
 if ($cargoUsuario === 'administrador') {
     $sql = "
@@ -264,7 +365,7 @@ if ($cargoUsuario === 'administrador') {
         LEFT JOIN usuarios u ON t.usuario_id = u.id
         LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
         WHERE t.arquivada = 0 {$where_extra}
-        ORDER BY t.prazo ASC
+        ORDER BY {$ordem_sql}
     ";
     $stmt = $pdo->prepare($sql);
     
@@ -283,7 +384,7 @@ if ($cargoUsuario === 'administrador') {
                OR t.usuario_id IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id3)
                OR t.atribuida_para IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id4))
           {$where_extra}
-        ORDER BY t.prazo ASC
+        ORDER BY {$ordem_sql}
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
@@ -303,14 +404,14 @@ if ($cargoUsuario === 'administrador') {
         WHERE t.arquivada = 0
           AND (t.usuario_id = :usuario_id OR t.atribuida_para = :usuario_id2)
           {$where_extra}
-        ORDER BY t.prazo ASC
+        ORDER BY {$ordem_sql}
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
 }
 
-// Bind dos parâmetros extras (busca, etc)
+// Bind dos parâmetros extras (busca, filtro_usuario, etc)
 foreach ($params as $key => $value) {
     $stmt->bindValue($key, $value);
 }
@@ -365,7 +466,7 @@ foreach ($tarefas as $tarefa) {
 $totalFiltrado = count($tarefasNormais) + count($tarefasFixas);
 
 // Verificar se há filtros ativos
-$filtrosAtivos = ($filtro_busca !== '' || $filtro_status !== 'todos' || $filtro_tipo !== 'todos');
+$filtrosAtivos = ($filtro_busca !== '' || $filtro_status !== 'todos' || $filtro_tipo !== 'todos' || $filtro_usuario !== 'todos');
 
 // Função para formatar prazo de forma amigável
 function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
@@ -389,7 +490,9 @@ function buildFilterUrl($params = []) {
     $current = [
         'busca' => $_GET['busca'] ?? '',
         'status' => $_GET['status'] ?? 'todos',
-        'tipo' => $_GET['tipo'] ?? 'todos'
+        'tipo' => $_GET['tipo'] ?? 'todos',
+        'usuario' => $_GET['usuario'] ?? 'todos',
+        'ordenar' => $_GET['ordenar'] ?? 'vencimento_asc'
     ];
     $merged = array_merge($current, $params);
     return '?' . http_build_query($merged);
@@ -445,7 +548,7 @@ function buildFilterUrl($params = []) {
         </div>
     </header>
 
-    <!-- Toast de mensagem -->
+    <!-- Toast de mensagem (flash) -->
     <?php if ($mensagem): ?>
         <div class="toast <?= $tipo_mensagem ?>">
             <div class="toast-icon">
@@ -466,6 +569,19 @@ function buildFilterUrl($params = []) {
             <button class="toast-close" onclick="this.parentElement.remove()">×</button>
         </div>
     <?php endif; ?>
+
+    <!-- Toast de Desfazer (controlado via JS) -->
+    <div id="toastDesfazer" class="toast-desfazer hidden">
+        <div class="toast-desfazer-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+            <span>Tarefa movida para o histórico</span>
+            <button type="button" id="btnDesfazer" class="btn-desfazer">Desfazer</button>
+            <div class="toast-progress"></div>
+        </div>
+    </div>
 
     <main class="tarefas-container">
         
@@ -536,6 +652,8 @@ function buildFilterUrl($params = []) {
                 <!-- Manter filtros atuais -->
                 <input type="hidden" name="status" value="<?= htmlspecialchars($filtro_status) ?>">
                 <input type="hidden" name="tipo" value="<?= htmlspecialchars($filtro_tipo) ?>">
+                <input type="hidden" name="usuario" value="<?= htmlspecialchars($filtro_usuario) ?>">
+                <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenar_por) ?>">
                 
                 <div class="busca-wrapper">
                     <svg class="busca-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -613,6 +731,42 @@ function buildFilterUrl($params = []) {
                 </div>
             </div>
 
+            <!-- Filtro por Usuário (só para admin e supervisor) -->
+            <?php if (!empty($usuariosFiltro)): ?>
+            <div class="filtros-grupo">
+                <span class="filtros-label">Usuário:</span>
+                <select class="filtro-select" onchange="window.location.href=this.value">
+                    <option value="<?= buildFilterUrl(['usuario' => 'todos']) ?>" <?= $filtro_usuario === 'todos' ? 'selected' : '' ?>>
+                        Todos
+                    </option>
+                    <?php foreach ($usuariosFiltro as $u): ?>
+                        <option value="<?= buildFilterUrl(['usuario' => $u['id']]) ?>" <?= $filtro_usuario == $u['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($u['nome']) ?> (<?= ucfirst($u['cargo']) ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+
+            <!-- Ordenação -->
+            <div class="filtros-grupo">
+                <span class="filtros-label">Ordenar:</span>
+                <select class="filtro-select" onchange="window.location.href=this.value">
+                    <option value="<?= buildFilterUrl(['ordenar' => 'vencimento_asc']) ?>" <?= $ordenar_por === 'vencimento_asc' ? 'selected' : '' ?>>
+                        Vencimento ↑
+                    </option>
+                    <option value="<?= buildFilterUrl(['ordenar' => 'vencimento_desc']) ?>" <?= $ordenar_por === 'vencimento_desc' ? 'selected' : '' ?>>
+                        Vencimento ↓
+                    </option>
+                    <option value="<?= buildFilterUrl(['ordenar' => 'criacao_desc']) ?>" <?= $ordenar_por === 'criacao_desc' ? 'selected' : '' ?>>
+                        Mais recentes
+                    </option>
+                    <option value="<?= buildFilterUrl(['ordenar' => 'criacao_asc']) ?>" <?= $ordenar_por === 'criacao_asc' ? 'selected' : '' ?>>
+                        Mais antigas
+                    </option>
+                </select>
+            </div>
+
             <!-- Limpar Filtros -->
             <?php if ($filtrosAtivos): ?>
                 <a href="tarefas.php" class="btn-limpar-filtros">
@@ -636,6 +790,18 @@ function buildFilterUrl($params = []) {
                     Mostrando <strong><?= $totalFiltrado ?></strong> tarefa<?= $totalFiltrado !== 1 ? 's' : '' ?>
                     <?php if ($filtro_busca !== ''): ?>
                         para "<strong><?= htmlspecialchars($filtro_busca) ?></strong>"
+                    <?php endif; ?>
+                    <?php if ($filtro_usuario !== 'todos'): ?>
+                        <?php 
+                        $nomeUsuarioFiltro = '';
+                        foreach ($usuariosFiltro as $u) {
+                            if ($u['id'] == $filtro_usuario) {
+                                $nomeUsuarioFiltro = $u['nome'];
+                                break;
+                            }
+                        }
+                        ?>
+                        de <strong><?= htmlspecialchars($nomeUsuarioFiltro) ?></strong>
                     <?php endif; ?>
                 </span>
             </div>
@@ -671,34 +837,40 @@ function buildFilterUrl($params = []) {
                             <input type="text" id="titulo" name="titulo" placeholder="O que precisa ser feito?" required>
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="prazo">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                        <line x1="16" y1="2" x2="16" y2="6"/>
-                                        <line x1="8" y1="2" x2="8" y2="6"/>
-                                        <line x1="3" y1="10" x2="21" y2="10"/>
-                                    </svg>
-                                    Prazo
-                                </label>
-                                <input type="date" id="prazo" name="prazo" required min="<?= date('Y-m-d') ?>">
+                        <div class="form-group">
+                            <label for="prazo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                                Prazo
+                            </label>
+                            
+                            <!-- Botões de Data Rápida -->
+                            <div class="date-shortcuts">
+                                <button type="button" class="date-shortcut-btn" data-days="0">Hoje</button>
+                                <button type="button" class="date-shortcut-btn" data-days="1">Amanhã</button>
+                                <button type="button" class="date-shortcut-btn" data-days="7">+7 dias</button>
                             </div>
+                            
+                            <input type="date" id="prazo" name="prazo" required min="<?= date('Y-m-d') ?>">
+                        </div>
 
-                            <div class="form-group">
-                                <label for="tipo">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                                        <polyline points="2 17 12 22 22 17"/>
-                                        <polyline points="2 12 12 17 22 12"/>
-                                    </svg>
-                                    Tipo
-                                </label>
-                                <select id="tipo" name="tipo">
-                                    <option value="normal">Única</option>
-                                    <option value="fixa">Recorrente</option>
-                                </select>
-                            </div>
+                        <div class="form-group">
+                            <label for="tipo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                                    <polyline points="2 17 12 22 22 17"/>
+                                    <polyline points="2 12 12 17 22 12"/>
+                                </svg>
+                                Tipo
+                            </label>
+                            <select id="tipo" name="tipo">
+                                <option value="normal">Única</option>
+                                <option value="fixa">Recorrente</option>
+                            </select>
                         </div>
 
                         <?php if (!empty($usuariosDisponiveis)): ?>
@@ -731,10 +903,10 @@ function buildFilterUrl($params = []) {
                     </form>
                 </div>
 
-                <!-- Quick Tips -->
+                <!-- Quick Tips (Dicas Rotativas) -->
                 <div class="tips-card">
-                    <h3>💡 Dica</h3>
-                    <p>Use os <strong>filtros</strong> acima para encontrar tarefas rapidamente por status ou tipo.</p>
+                    <h3><?= $dicaAtual['icone'] ?> <?= $dicaAtual['titulo'] ?></h3>
+                    <p><?= $dicaAtual['texto'] ?></p>
                 </div>
             </aside>
 
@@ -794,9 +966,9 @@ function buildFilterUrl($params = []) {
                         <?php else: ?>
                             <div class="tasks-list">
                                 <?php foreach ($tarefasNormais as $tarefa): ?>
-                                    <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                    <div class="task-item <?= $tarefa['status_visual'] ?>" data-task-id="<?= $tarefa['id'] ?>">
                                         <!-- Checkbox -->
-                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>&usuario=<?= $filtro_usuario ?>&ordenar=<?= $ordenar_por ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
                                             <?php if ($tarefa['status'] === 'concluida'): ?>
                                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -885,12 +1057,18 @@ function buildFilterUrl($params = []) {
                                                     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                                 </svg>
                                             </button>
-                                            <a href="?acao=delete&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                            <button 
+                                                type="button" 
+                                                class="action-btn btn-delete btn-arquivar" 
+                                                data-id="<?= $tarefa['id'] ?>"
+                                                data-titulo="<?= htmlspecialchars($tarefa['titulo'], ENT_QUOTES) ?>"
+                                                title="Arquivar"
+                                            >
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <polyline points="3 6 5 6 21 6"/>
                                                     <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                                                 </svg>
-                                            </a>
+                                            </button>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -921,9 +1099,9 @@ function buildFilterUrl($params = []) {
                         <?php else: ?>
                             <div class="tasks-list">
                                 <?php foreach ($tarefasFixas as $tarefa): ?>
-                                    <div class="task-item <?= $tarefa['status_visual'] ?>">
+                                    <div class="task-item <?= $tarefa['status_visual'] ?>" data-task-id="<?= $tarefa['id'] ?>">
                                         <!-- Checkbox -->
-                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
+                                        <a href="?acao=toggle&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>&usuario=<?= $filtro_usuario ?>&ordenar=<?= $ordenar_por ?>" class="task-checkbox" title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>">
                                             <?php if ($tarefa['status'] === 'concluida'): ?>
                                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -1003,12 +1181,18 @@ function buildFilterUrl($params = []) {
                                                     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                                 </svg>
                                             </button>
-                                            <a href="?acao=delete&id=<?= $tarefa['id'] ?>&busca=<?= urlencode($filtro_busca) ?>&status=<?= $filtro_status ?>&tipo=<?= $filtro_tipo ?>" class="action-btn btn-delete" title="Arquivar" onclick="return confirm('Mover esta tarefa para o histórico?')">
+                                            <button 
+                                                type="button" 
+                                                class="action-btn btn-delete btn-arquivar" 
+                                                data-id="<?= $tarefa['id'] ?>"
+                                                data-titulo="<?= htmlspecialchars($tarefa['titulo'], ENT_QUOTES) ?>"
+                                                title="Arquivar"
+                                            >
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <polyline points="3 6 5 6 21 6"/>
                                                     <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                                                 </svg>
-                                            </a>
+                                            </button>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
