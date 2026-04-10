@@ -1,0 +1,123 @@
+<?php
+
+function getDicasTarefas(): array
+{
+    return [
+        [
+            'icone' => '💡',
+            'titulo' => 'Filtros rápidos',
+            'texto' => 'Use os <strong>filtros</strong> acima para encontrar tarefas rapidamente por status ou tipo.'
+        ],
+        [
+            'icone' => '🔄',
+            'titulo' => 'Tarefas recorrentes',
+            'texto' => 'Tarefas <strong>recorrentes</strong> se renovam automaticamente todo mês após o prazo.'
+        ],
+        [
+            'icone' => '✅',
+            'titulo' => 'Marcar como concluída',
+            'texto' => 'Clique no <strong>círculo</strong> ao lado da tarefa para marcá-la como concluída.'
+        ],
+        [
+            'icone' => '📝',
+            'titulo' => 'Observações',
+            'texto' => 'Use o botão de <strong>editar</strong> para adicionar observações importantes às tarefas.'
+        ],
+        [
+            'icone' => '📅',
+            'titulo' => 'Atalhos de data',
+            'texto' => 'Use os botões <strong>Hoje</strong>, <strong>Amanhã</strong> ou <strong>+7 dias</strong> para definir prazos rapidamente.'
+        ],
+        [
+            'icone' => '🗂️',
+            'titulo' => 'Histórico',
+            'texto' => 'Tarefas arquivadas vão para o <strong>Histórico</strong>, onde podem ser restauradas ou excluídas.'
+        ],
+        [
+            'icone' => '↩️',
+            'titulo' => 'Desfazer exclusão',
+            'texto' => 'Arquivou sem querer? Clique em <strong>Desfazer</strong> no aviso que aparece para recuperar a tarefa.'
+        ],
+        [
+            'icone' => '🔍',
+            'titulo' => 'Busca inteligente',
+            'texto' => 'Digite qualquer parte do <strong>título</strong> da tarefa na busca para encontrá-la rapidamente.'
+        ],
+        [
+            'icone' => '👥',
+            'titulo' => 'Atribuir tarefas',
+            'texto' => 'Supervisores podem <strong>atribuir tarefas</strong> para seus funcionários no formulário de criação.'
+        ],
+        [
+            'icone' => '📊',
+            'titulo' => 'Ordenação',
+            'texto' => 'Use a <strong>ordenação</strong> para ver primeiro as tarefas mais urgentes ou mais recentes.'
+        ]
+    ];
+}
+
+function getDicaAleatoriaTarefas(): array
+{
+    $dicas = getDicasTarefas();
+
+    return $dicas[array_rand($dicas)];
+}
+
+function obterFiltrosTarefas(): array
+{
+    return [
+        'busca' => trim($_GET['busca'] ?? ''),
+        'status' => $_GET['status'] ?? 'todos',
+        'tipo' => $_GET['tipo'] ?? 'todos',
+        'usuario' => $_GET['usuario'] ?? 'todos',
+        'ordenar' => $_GET['ordenar'] ?? 'vencimento_asc',
+    ];
+}
+
+function buildFilterUrl(array $params = []): string
+{
+    return '?' . http_build_query(array_merge(obterFiltrosTarefas(), $params));
+}
+
+function formatarPrazo(string $prazo, string $statusVisual, int $diasAtraso = 0): string
+{
+    if ($statusVisual === 'atrasada') {
+        return $diasAtraso . ' dia' . ($diasAtraso > 1 ? 's' : '') . ' de atraso';
+    }
+
+    if ($statusVisual === 'hoje') {
+        return 'Vence hoje';
+    }
+
+    $hoje = new DateTime('today');
+    $dataPrazo = new DateTime($prazo);
+    $diff = $hoje->diff($dataPrazo)->days;
+
+    if ($diff <= 7) {
+        return 'em ' . $diff . ' dia' . ($diff > 1 ? 's' : '');
+    }
+
+    return date('d/m/Y', strtotime($prazo));
+}
+
+function nomeUsuarioFiltroSelecionado(array $usuariosFiltro, string $filtroUsuario): string
+{
+    foreach ($usuariosFiltro as $usuario) {
+        if ((string) $usuario['id'] === $filtroUsuario) {
+            return $usuario['nome'];
+        }
+    }
+
+    return '';
+}
+
+function montarQueryStringFiltros(array $filtros): string
+{
+    return http_build_query([
+        'busca' => $filtros['busca'],
+        'status' => $filtros['status'],
+        'tipo' => $filtros['tipo'],
+        'usuario' => $filtros['usuario'],
+        'ordenar' => $filtros['ordenar'],
+    ]);
+}

@@ -1,17 +1,19 @@
-<?php
+﻿<?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 session_start();
 
-// Sistema de mensagens flash
 $mensagem = $_SESSION['mensagem'] ?? null;
 $tipo_mensagem = $_SESSION['tipo_mensagem'] ?? null;
 unset($_SESSION['mensagem'], $_SESSION['tipo_mensagem']);
 
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
+require_once __DIR__ . '/includes/tarefas_helpers.php';
+require_once __DIR__ . '/includes/tarefas_repository.php';
+require_once __DIR__ . '/includes/tarefas_service.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     header('Location: login.php');
@@ -19,159 +21,42 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 $usuario_id = $_SESSION['usuario_id'];
-
-// Buscar informações do usuário logado (cargo)
-$sqlUsuario = "SELECT cargo, nome FROM usuarios WHERE id = :usuario_id";
-$stmtUsuario = $pdo->prepare($sqlUsuario);
-$stmtUsuario->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-$stmtUsuario->execute();
-$usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
+$usuarioLogado = buscarUsuarioLogadoParaTarefas($pdo, $usuario_id);
 $cargoUsuario = $usuarioLogado['cargo'];
 $nomeUsuario = $usuarioLogado['nome'];
+$dicaAtual = getDicaAleatoriaTarefas();
 
-// ═══════════════════════════════════════════════════════════════
-// DICAS ROTATIVAS
-// ═══════════════════════════════════════════════════════════════
-$dicas = [
-    [
-        'icone' => '💡',
-        'titulo' => 'Filtros rápidos',
-        'texto' => 'Use os <strong>filtros</strong> acima para encontrar tarefas rapidamente por status ou tipo.'
-    ],
-    [
-        'icone' => '🔄',
-        'titulo' => 'Tarefas recorrentes',
-        'texto' => 'Tarefas <strong>recorrentes</strong> se renovam automaticamente todo mês após o prazo.'
-    ],
-    [
-        'icone' => '✅',
-        'titulo' => 'Marcar como concluída',
-        'texto' => 'Clique no <strong>círculo</strong> ao lado da tarefa para marcá-la como concluída.'
-    ],
-    [
-        'icone' => '📝',
-        'titulo' => 'Observações',
-        'texto' => 'Use o botão de <strong>editar</strong> para adicionar observações importantes às tarefas.'
-    ],
-    [
-        'icone' => '📅',
-        'titulo' => 'Atalhos de data',
-        'texto' => 'Use os botões <strong>Hoje</strong>, <strong>Amanhã</strong> ou <strong>+7 dias</strong> para definir prazos rapidamente.'
-    ],
-    [
-        'icone' => '🗂️',
-        'titulo' => 'Histórico',
-        'texto' => 'Tarefas arquivadas vão para o <strong>Histórico</strong>, onde podem ser restauradas ou excluídas.'
-    ],
-    [
-        'icone' => '↩️',
-        'titulo' => 'Desfazer exclusão',
-        'texto' => 'Arquivou sem querer? Clique em <strong>Desfazer</strong> no aviso que aparece para recuperar a tarefa.'
-    ],
-    [
-        'icone' => '🔍',
-        'titulo' => 'Busca inteligente',
-        'texto' => 'Digite qualquer parte do <strong>título</strong> da tarefa na busca para encontrá-la rapidamente.'
-    ],
-    [
-        'icone' => '👥',
-        'titulo' => 'Atribuir tarefas',
-        'texto' => 'Supervisores podem <strong>atribuir tarefas</strong> para seus funcionários no formulário de criação.'
-    ],
-    [
-        'icone' => '📊',
-        'titulo' => 'Ordenação',
-        'texto' => 'Use a <strong>ordenação</strong> para ver primeiro as tarefas mais urgentes ou mais recentes.'
-    ]
-];
+$filtros = obterFiltrosTarefas();
+$filtro_busca = $filtros['busca'];
+$filtro_status = $filtros['status'];
+$filtro_tipo = $filtros['tipo'];
+$filtro_usuario = $filtros['usuario'];
+$ordenar_por = $filtros['ordenar'];
 
-// Seleciona uma dica aleatória
-$dicaAtual = $dicas[array_rand($dicas)];
-
-// ═══════════════════════════════════════════════════════════════
-// FILTROS E BUSCA
-// ═══════════════════════════════════════════════════════════════
-$filtro_busca = trim($_GET['busca'] ?? '');
-$filtro_status = $_GET['status'] ?? 'todos';
-$filtro_tipo = $_GET['tipo'] ?? 'todos';
-$filtro_usuario = $_GET['usuario'] ?? 'todos';
-$ordenar_por = $_GET['ordenar'] ?? 'vencimento_asc';
-
-// Buscar lista de usuários para atribuição de tarefas (só admin e supervisor veem)
-$usuariosDisponiveis = [];
-if ($cargoUsuario === 'administrador' || $cargoUsuario === 'supervisor') {
-    $sqlUsuarios = "
-        SELECT id, nome, cargo 
-        FROM usuarios 
-        WHERE id != :usuario_id
-    ";
-    
-    if ($cargoUsuario === 'supervisor') {
-        $sqlUsuarios .= " AND supervisor_id = :usuario_id";
-    }
-    
-    $sqlUsuarios .= " ORDER BY nome ASC";
-    
-    $stmtUsuarios = $pdo->prepare($sqlUsuarios);
-    $stmtUsuarios->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmtUsuarios->execute();
-    $usuariosDisponiveis = $stmtUsuarios->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// Buscar lista de usuários para FILTRO (diferente da atribuição)
-$usuariosFiltro = [];
-if ($cargoUsuario === 'administrador') {
-    // Admin vê todos os usuários
-    $sqlFiltroUsuarios = "
-        SELECT id, nome, cargo 
-        FROM usuarios 
-        ORDER BY cargo, nome ASC
-    ";
-    $stmtFiltroUsuarios = $pdo->prepare($sqlFiltroUsuarios);
-    $stmtFiltroUsuarios->execute();
-    $usuariosFiltro = $stmtFiltroUsuarios->fetchAll(PDO::FETCH_ASSOC);
-} elseif ($cargoUsuario === 'supervisor') {
-    // Supervisor vê ele mesmo + seus funcionários
-    $sqlFiltroUsuarios = "
-        SELECT id, nome, cargo 
-        FROM usuarios 
-        WHERE id = :usuario_id OR supervisor_id = :usuario_id2
-        ORDER BY cargo DESC, nome ASC
-    ";
-    $stmtFiltroUsuarios = $pdo->prepare($sqlFiltroUsuarios);
-    $stmtFiltroUsuarios->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmtFiltroUsuarios->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
-    $stmtFiltroUsuarios->execute();
-    $usuariosFiltro = $stmtFiltroUsuarios->fetchAll(PDO::FETCH_ASSOC);
-}
+$usuariosDisponiveis = buscarUsuariosDisponiveisParaAtribuicao($pdo, $cargoUsuario, $usuario_id);
+$usuariosFiltro = buscarUsuariosFiltroTarefas($pdo, $cargoUsuario, $usuario_id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $titulo = trim($_POST['titulo']);
-    $prazo  = $_POST['prazo'];
+    $prazo = $_POST['prazo'];
     $tipo = $_POST['tipo'] ?? 'normal';
-    $atribuida_para = isset($_POST['atribuida_para']) && $_POST['atribuida_para'] !== '' ? (int)$_POST['atribuida_para'] : null;
+    $atribuida_para = isset($_POST['atribuida_para']) && $_POST['atribuida_para'] !== '' ? (int) $_POST['atribuida_para'] : null;
+    $hojePost = date('Y-m-d');
 
-    $hoje = date('Y-m-d');
-    
     if ($titulo === '' || $prazo === '') {
         $_SESSION['mensagem'] = 'Preencha todos os campos obrigatórios!';
         $_SESSION['tipo_mensagem'] = 'erro';
-    } elseif ($prazo < $hoje) {
+    } elseif ($prazo < $hojePost) {
         $_SESSION['mensagem'] = 'A data não pode ser anterior a hoje!';
         $_SESSION['tipo_mensagem'] = 'erro';
     } else {
-        $sqlInsert = "
-            INSERT INTO tarefas (titulo, prazo, status, tipo, usuario_id, atribuida_para)
-            VALUES (:titulo, :prazo, 'pendente', :tipo, :usuario_id, :atribuida_para)
-        ";
-
-        $stmtInsert = $pdo->prepare($sqlInsert);
-        $stmtInsert->bindParam(':titulo', $titulo);
-        $stmtInsert->bindParam(':prazo', $prazo);
-        $stmtInsert->bindParam(':usuario_id', $usuario_id);
-        $stmtInsert->bindParam(':tipo', $tipo);
-        $stmtInsert->bindParam(':atribuida_para', $atribuida_para, PDO::PARAM_INT);
-        $stmtInsert->execute();
+        criarTarefa($pdo, [
+            'titulo' => $titulo,
+            'prazo' => $prazo,
+            'tipo' => $tipo,
+            'usuario_id' => $usuario_id,
+            'atribuida_para' => $atribuida_para,
+        ]);
 
         $_SESSION['mensagem'] = 'Tarefa adicionada com sucesso!';
         $_SESSION['tipo_mensagem'] = 'sucesso';
@@ -181,322 +66,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// UPDATE - alterar status da tarefa
 if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $tarefa_id = (int) $_GET['id'];
+    $tarefaCheck = buscarPermissaoTarefa($pdo, $tarefa_id);
 
-    // Verificar se o usuário tem permissão para alterar esta tarefa
-    $sqlCheck = "SELECT usuario_id, atribuida_para FROM tarefas WHERE id = :id";
-    $stmtCheck = $pdo->prepare($sqlCheck);
-    $stmtCheck->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
-    $stmtCheck->execute();
-    $tarefaCheck = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-
-    $podeAlterar = false;
-    if ($cargoUsuario === 'administrador') {
-        $podeAlterar = true;
-    } elseif ($tarefaCheck['usuario_id'] == $usuario_id || $tarefaCheck['atribuida_para'] == $usuario_id) {
-        $podeAlterar = true;
-    }
+    $podeAlterar = $cargoUsuario === 'administrador'
+        || ($tarefaCheck && ($tarefaCheck['usuario_id'] == $usuario_id || $tarefaCheck['atribuida_para'] == $usuario_id));
 
     if ($podeAlterar) {
-        $sqlUpdate = "
-            UPDATE tarefas
-            SET status = CASE 
-                WHEN status != 'concluida' THEN 'concluida'
-                ELSE 'pendente'
-            END
-            WHERE id = :id
-        ";
-
-        $stmtUpdate = $pdo->prepare($sqlUpdate);
-        $stmtUpdate->bindParam(':id', $tarefa_id, PDO::PARAM_INT);
-        $stmtUpdate->execute();
-
+        alternarStatusTarefa($pdo, $tarefa_id);
         $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
         $_SESSION['tipo_mensagem'] = 'sucesso';
     }
 
-    // Preservar filtros ao redirecionar
-    $params = http_build_query([
-        'busca' => $filtro_busca,
-        'status' => $filtro_status,
-        'tipo' => $filtro_tipo,
-        'usuario' => $filtro_usuario,
-        'ordenar' => $ordenar_por
-    ]);
-    header('Location: tarefas.php?' . $params);
+    header('Location: tarefas.php?' . montarQueryStringFiltros($filtros));
     exit;
 }
 
 $hoje = new DateTime('today');
+processarRecorrenciaTarefasFixas($pdo, $usuario_id, $hoje);
 
-// Lógica de tarefas fixas
-$sqlFixas = "
-    SELECT *
-    FROM tarefas
-    WHERE tipo = 'fixa'
-      AND status = 'pendente'
-      AND usuario_id = :usuario_id
-";
+$tarefas = buscarTarefasFiltradas($pdo, $cargoUsuario, $usuario_id, $filtros);
+$classificacao = classificarTarefasParaExibicao($tarefas, $filtro_status, $hoje);
 
-$stmtFixas = $pdo->prepare($sqlFixas);
-$stmtFixas->bindParam(':usuario_id', $usuario_id);
-$stmtFixas->execute();
-
-$tarefasFixasPendentes = $stmtFixas->fetchAll(PDO::FETCH_ASSOC);
-
-foreach ($tarefasFixasPendentes as $tarefa) {
-    $prazo = new DateTime($tarefa['prazo']);
-
-    if ($prazo >= $hoje) {
-        continue;
-    }
-
-    $proximoPrazo = clone $prazo;
-    $proximoPrazo->modify('+1 month');
-
-    $mes = (int) $proximoPrazo->format('n');
-    $ano = (int) $proximoPrazo->format('Y');
-
-    $sqlExiste = "
-        SELECT COUNT(*) 
-        FROM tarefas
-        WHERE tipo = 'fixa'
-          AND usuario_id = :usuario_id
-          AND titulo = :titulo
-          AND mes_referencia = :mes
-          AND ano_referencia = :ano
-    ";
-
-    $stmtExiste = $pdo->prepare($sqlExiste);
-    $stmtExiste->execute([
-        ':usuario_id' => $usuario_id,
-        ':titulo'     => $tarefa['titulo'],
-        ':mes'        => $mes,
-        ':ano'        => $ano
-    ]);
-
-    if ($stmtExiste->fetchColumn() > 0) {
-        continue;
-    }
-
-    $origemId = $tarefa['tarefa_origem_id'] ?? $tarefa['id'];
-
-    $sqlInsert = "
-        INSERT INTO tarefas (
-            titulo, prazo, status, tipo, usuario_id,
-            mes_referencia, ano_referencia, tarefa_origem_id
-        ) VALUES (
-            :titulo, :prazo, 'pendente', 'fixa', :usuario_id,
-            :mes, :ano, :origem
-        )
-    ";
-
-    $stmtInsert = $pdo->prepare($sqlInsert);
-    $stmtInsert->execute([
-        ':titulo'     => $tarefa['titulo'],
-        ':prazo'      => $proximoPrazo->format('Y-m-d'),
-        ':usuario_id' => $usuario_id,
-        ':mes'        => $mes,
-        ':ano'        => $ano,
-        ':origem'     => $origemId
-    ]);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MONTAR QUERY COM FILTROS
-// ═══════════════════════════════════════════════════════════════
-$params = [];
-$where_extra = "";
-
-// Filtro de busca por título
-if ($filtro_busca !== '') {
-    $where_extra .= " AND t.titulo LIKE :busca";
-    $params[':busca'] = '%' . $filtro_busca . '%';
-}
-
-// Filtro por tipo
-if ($filtro_tipo === 'normal') {
-    $where_extra .= " AND t.tipo = 'normal'";
-} elseif ($filtro_tipo === 'fixa') {
-    $where_extra .= " AND t.tipo = 'fixa'";
-}
-
-// Filtro por status (será aplicado depois no PHP para "atrasada")
-if ($filtro_status === 'pendente') {
-    $where_extra .= " AND t.status = 'pendente'";
-} elseif ($filtro_status === 'concluida') {
-    $where_extra .= " AND t.status = 'concluida'";
-}
-
-// Filtro por usuário específico
-if ($filtro_usuario !== 'todos' && is_numeric($filtro_usuario)) {
-    $where_extra .= " AND (t.usuario_id = :filtro_usuario_id OR t.atribuida_para = :filtro_usuario_id2)";
-    $params[':filtro_usuario_id'] = (int)$filtro_usuario;
-    $params[':filtro_usuario_id2'] = (int)$filtro_usuario;
-}
-
-// Definir ordenação SQL
-$ordem_sql = "t.prazo ASC"; // padrão
-switch ($ordenar_por) {
-    case 'vencimento_asc':
-        $ordem_sql = "t.prazo ASC";
-        break;
-    case 'vencimento_desc':
-        $ordem_sql = "t.prazo DESC";
-        break;
-    case 'criacao_asc':
-        $ordem_sql = "t.id ASC";
-        break;
-    case 'criacao_desc':
-        $ordem_sql = "t.id DESC";
-        break;
-}
-
-// Montar query baseada no cargo do usuário
-if ($cargoUsuario === 'administrador') {
-    $sql = "
-        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes, 
-               t.usuario_id, t.atribuida_para,
-               u.nome as criador_nome,
-               ua.nome as atribuido_nome
-        FROM tarefas t
-        LEFT JOIN usuarios u ON t.usuario_id = u.id
-        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
-        WHERE t.arquivada = 0 {$where_extra}
-        ORDER BY {$ordem_sql}
-    ";
-    $stmt = $pdo->prepare($sql);
-    
-} elseif ($cargoUsuario === 'supervisor') {
-    $sql = "
-        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
-               t.usuario_id, t.atribuida_para,
-               u.nome as criador_nome,
-               ua.nome as atribuido_nome
-        FROM tarefas t
-        LEFT JOIN usuarios u ON t.usuario_id = u.id
-        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
-        WHERE t.arquivada = 0
-          AND (t.usuario_id = :usuario_id 
-               OR t.atribuida_para = :usuario_id2
-               OR t.usuario_id IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id3)
-               OR t.atribuida_para IN (SELECT id FROM usuarios WHERE supervisor_id = :usuario_id4))
-          {$where_extra}
-        ORDER BY {$ordem_sql}
-    ";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id3', $usuario_id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id4', $usuario_id, PDO::PARAM_INT);
-    
-} else {
-    $sql = "
-        SELECT t.id, t.titulo, t.prazo, t.status, t.tipo, t.observacoes,
-               t.usuario_id, t.atribuida_para,
-               u.nome as criador_nome,
-               ua.nome as atribuido_nome
-        FROM tarefas t
-        LEFT JOIN usuarios u ON t.usuario_id = u.id
-        LEFT JOIN usuarios ua ON t.atribuida_para = ua.id
-        WHERE t.arquivada = 0
-          AND (t.usuario_id = :usuario_id OR t.atribuida_para = :usuario_id2)
-          {$where_extra}
-        ORDER BY {$ordem_sql}
-    ";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id2', $usuario_id, PDO::PARAM_INT);
-}
-
-// Bind dos parâmetros extras (busca, filtro_usuario, etc)
-foreach ($params as $key => $value) {
-    $stmt->bindValue($key, $value);
-}
-
-$stmt->execute();
-$tarefas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Classificar tarefas
-$tarefasNormais = [];
-$tarefasFixas   = [];
-$contadorPendentes = 0;
-$contadorConcluidas = 0;
-$contadorAtrasadas = 0;
-$contadorHoje = 0;
-
-foreach ($tarefas as $tarefa) {
-    $prazoTarefa = new DateTime($tarefa['prazo']);
-    $statusVisual = 'futura';
-    
-    if ($tarefa['status'] === 'concluida') {
-        $statusVisual = 'concluida';
-        $contadorConcluidas++;
-    } else {
-        $contadorPendentes++;
-        
-        if ($prazoTarefa < $hoje) {
-            $statusVisual = 'atrasada';
-            $diasAtraso = $hoje->diff($prazoTarefa)->days;
-            $tarefa['dias_atraso'] = $diasAtraso;
-            $contadorAtrasadas++;
-        } elseif ($prazoTarefa == $hoje) {
-            $statusVisual = 'hoje';
-            $contadorHoje++;
-        }
-    }
-    
-    $tarefa['status_visual'] = $statusVisual;
-    
-    // Filtro de atrasadas (feito aqui pois depende de cálculo de data)
-    if ($filtro_status === 'atrasada' && $statusVisual !== 'atrasada') {
-        continue;
-    }
-    
-    if ($tarefa['tipo'] === 'fixa') {
-        $tarefasFixas[] = $tarefa;
-    } else {
-        $tarefasNormais[] = $tarefa;
-    }
-}
-
-// Total filtrado
-$totalFiltrado = count($tarefasNormais) + count($tarefasFixas);
-
-// Verificar se há filtros ativos
-$filtrosAtivos = ($filtro_busca !== '' || $filtro_status !== 'todos' || $filtro_tipo !== 'todos' || $filtro_usuario !== 'todos');
-
-// Função para formatar prazo de forma amigável
-function formatarPrazo($prazo, $statusVisual, $diasAtraso = 0) {
-    if ($statusVisual === 'atrasada') {
-        return $diasAtraso . ' dia' . ($diasAtraso > 1 ? 's' : '') . ' de atraso';
-    } elseif ($statusVisual === 'hoje') {
-        return 'Vence hoje';
-    } else {
-        $hoje = new DateTime();
-        $dataPrazo = new DateTime($prazo);
-        $diff = $hoje->diff($dataPrazo)->days;
-        if ($diff <= 7) {
-            return 'em ' . $diff . ' dia' . ($diff > 1 ? 's' : '');
-        }
-        return date('d/m/Y', strtotime($prazo));
-    }
-}
-
-// Função auxiliar para manter filtros nos links
-function buildFilterUrl($params = []) {
-    $current = [
-        'busca' => $_GET['busca'] ?? '',
-        'status' => $_GET['status'] ?? 'todos',
-        'tipo' => $_GET['tipo'] ?? 'todos',
-        'usuario' => $_GET['usuario'] ?? 'todos',
-        'ordenar' => $_GET['ordenar'] ?? 'vencimento_asc'
-    ];
-    $merged = array_merge($current, $params);
-    return '?' . http_build_query($merged);
-}
+$tarefasNormais = $classificacao['tarefasNormais'];
+$tarefasFixas = $classificacao['tarefasFixas'];
+$contadorPendentes = $classificacao['contadorPendentes'];
+$contadorConcluidas = $classificacao['contadorConcluidas'];
+$contadorAtrasadas = $classificacao['contadorAtrasadas'];
+$contadorHoje = $classificacao['contadorHoje'];
+$totalFiltrado = $classificacao['totalFiltrado'];
+$filtrosAtivos = filtrosDeTarefasEstaoAtivos($filtros);
+$nomeUsuarioFiltro = nomeUsuarioFiltroSelecionado($usuariosFiltro, (string) $filtro_usuario);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -643,9 +244,9 @@ function buildFilterUrl($params = []) {
             </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <!-- BARRA DE FILTROS E BUSCA -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="filtros-bar">
             <!-- Busca -->
             <form method="GET" class="filtro-busca-form">
