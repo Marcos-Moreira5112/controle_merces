@@ -12,6 +12,7 @@ unset($_SESSION['mensagem'], $_SESSION['tipo_mensagem']);
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
 require_once __DIR__ . '/includes/tarefas_helpers.php';
+require_once __DIR__ . '/includes/tarefas_view.php';
 require_once __DIR__ . '/includes/tarefas_repository.php';
 require_once __DIR__ . '/includes/tarefas_service.php';
 
@@ -97,7 +98,6 @@ $contadorAtrasadas = $classificacao['contadorAtrasadas'];
 $contadorHoje = $classificacao['contadorHoje'];
 $totalFiltrado = $classificacao['totalFiltrado'];
 $filtrosAtivos = filtrosDeTarefasEstaoAtivos($filtros);
-$nomeUsuarioFiltro = nomeUsuarioFiltroSelecionado($usuariosFiltro, (string) $filtro_usuario);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -605,7 +605,6 @@ $nomeUsuarioFiltro = nomeUsuarioFiltroSelecionado($usuariosFiltro, (string) $fil
                                                         <line x1="8" y1="2" x2="8" y2="6"/>
                                                         <line x1="3" y1="10" x2="21" y2="10"/>
                                                     </svg>
-                                                    <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
                                                 </span>
                                                 
                                                 <?php if ($cargoUsuario !== 'funcionario'): ?>
@@ -743,7 +742,6 @@ $nomeUsuarioFiltro = nomeUsuarioFiltroSelecionado($usuariosFiltro, (string) $fil
                                                         <line x1="8" y1="2" x2="8" y2="6"/>
                                                         <line x1="3" y1="10" x2="21" y2="10"/>
                                                     </svg>
-                                                    <?= formatarPrazo($tarefa['prazo'], $tarefa['status_visual'], $tarefa['dias_atraso'] ?? 0) ?>
                                                 </span>
                                                 
                                                 <?php if ($cargoUsuario !== 'funcionario'): ?>
