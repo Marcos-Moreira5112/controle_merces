@@ -113,8 +113,8 @@
 }
 
 .mini-stat.alert {
-    background: linear-gradient(135deg, #fef2f2, #fee2e2);
-    border: 1px solid #fecaca;
+    background: white;
+    border: 1px solid #e5e7eb;
 }
 
 .mini-stat-icon {
@@ -921,96 +921,11 @@
     margin-bottom: 1.5rem;
 }
 
-/* ===== BUSCA ===== */
-.filtros-bar .filtro-busca-form {
-    flex: 1;
-    min-width: 200px;
-    max-width: 300px;
-    margin: 0;
-    padding: 0;
-}
-
-.filtros-bar .busca-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: 36px;
-    width: 100%;
-}
-
-.filtros-bar .busca-wrapper .busca-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: #94a3b8;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.filtros-bar .busca-wrapper .busca-input {
-    width: 100%;
-    height: 36px;
-    padding: 0 36px 0 34px; /* Esquerda: espaço pro ícone | Direita: espaço pro X */
-    margin: 0;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    line-height: 36px;
-    box-sizing: border-box;
-    background: white;
-    transition: all 0.2s;
-}
-
-.filtros-bar .busca-wrapper .busca-input:focus {
-    outline: none;
-    border-color: var(--laranja);
-    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.1);
-}
-
-.filtros-bar .busca-wrapper .busca-input::placeholder {
-    color: #94a3b8;
-    line-height: normal;
-}
-
-.filtros-bar .busca-wrapper .busca-limpar {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #94a3b8;
-    border-radius: 4px;
-    transition: all 0.2s;
-    cursor: pointer;
-    z-index: 2;
-    background: transparent;
-    border: none;
-    padding: 0;
-}
-
-.filtros-bar .busca-limpar:hover {
-    background: #f1f5f9;
-    color: var(--cinza-texto);
-}
-
-.filtros-bar .busca-limpar svg {
-    width: 14px;
-    height: 14px;
-}
-
 /* ===== GRUPOS DE FILTROS ===== */
 .filtros-bar .filtros-grupo {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    height: 36px;
 }
 
 .filtros-bar .filtros-label {
@@ -1026,7 +941,6 @@
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    height: 36px;
 }
 
 .filtros-bar .filtro-btn {
@@ -1553,4 +1467,354 @@ a.action-btn.btn-delete:hover svg {
         margin-left: 0;
         margin-top: 0.5rem;
     }
+}
+
+.tarefas-filtros-card {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    padding: 1rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    margin-bottom: 1.25rem;
+}
+
+.tarefas-filtros-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.filtro-busca-form {
+    flex: 1 1 280px;
+    min-width: 260px;
+}
+
+.busca-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.busca-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: calc(50% + 1px);
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: #94a3b8;
+    pointer-events: none;
+    display: block;
+}
+
+.busca-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 2.5rem 0 2.6rem;
+    margin-bottom: 0;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #f8fafc;
+    line-height: 1;
+    box-sizing: border-box;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.busca-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--laranja);
+    box-shadow: 0 0 0 4px rgba(245, 124, 0, 0.10);
+}
+
+.busca-limpar {
+    position: absolute;
+    right: 0.75rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    background: transparent;
+}
+
+.busca-limpar:hover {
+    background: #eef2f7;
+    text-decoration: none;
+}
+
+.busca-limpar svg {
+    width: 15px;
+    height: 15px;
+}
+
+.tarefas-filtros-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.btn-limpar-filtros {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 46px;
+    padding: 0 1rem;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn-limpar-filtros:hover {
+    background: #eef2f7;
+    text-decoration: none;
+}
+
+.btn-limpar-filtros svg {
+    width: 16px;
+    height: 16px;
+}
+
+.tarefas-filtros-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1.1fr 1fr;
+    gap: 0.9rem;
+    align-items: start;
+}
+
+.filtros-bloco {
+    min-width: 0;
+}
+
+.filtros-label {
+    display: block;
+    margin-bottom: 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+}
+
+.filtros-botoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.filtro-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 40px;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+    white-space: nowrap;
+}
+
+.filtro-btn:hover {
+    transform: translateY(-1px);
+    background: #eef2f7;
+    border-color: #cbd5e1;
+    text-decoration: none;
+}
+
+.filtro-btn.ativo {
+    background: #fff7ed;
+    border-color: var(--laranja);
+    color: var(--laranja);
+    box-shadow: 0 0 0 4px rgba(245, 124, 0, 0.08);
+}
+
+.filtro-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.filtro-dot.pendente { background: #f59e0b; }
+.filtro-dot.atrasada { background: #ef4444; }
+.filtro-dot.concluida { background: #10b981; }
+
+.filtros-bloco-select {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem;
+}
+
+.filtro-select-group {
+    min-width: 0;
+}
+
+.filtro-select {
+    width: 100%;
+    height: 40px;
+    margin-bottom: 0;
+    padding: 0 0.8rem;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #f8fafc;
+    font-size: 0.92rem;
+    color: #0f172a;
+}
+
+.filtro-select:focus {
+    outline: none;
+    border-color: var(--laranja);
+    box-shadow: 0 0 0 4px rgba(245, 124, 0, 0.10);
+    background: #fff;
+}
+
+.filtros-resultado {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eef2f7;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: #475569;
+    font-size: 0.94rem;
+    flex-wrap: wrap;
+}
+
+.filtros-resultado svg {
+    width: 16px;
+    height: 16px;
+    color: var(--laranja);
+    flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+    .tarefas-filtros-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .filtros-bloco-select {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .tarefas-filtros-card {
+        padding: 0.85rem;
+        border-radius: 16px;
+    }
+
+    .tarefas-filtros-top {
+        flex-direction: column;
+    }
+
+    .tarefas-filtros-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .btn-limpar-filtros {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .filtros-botoes {
+        gap: 0.45rem;
+    }
+
+    .filtro-btn {
+        height: 38px;
+        padding: 0 0.8rem;
+        font-size: 0.88rem;
+    }
+}
+
+/* ===== BUSCA NOVA ===== */
+.tarefas-filtros-card .filtro-busca-form {
+    flex: 1 1 280px;
+    min-width: 260px;
+    margin: 0;
+    padding: 0;
+}
+
+.tarefas-filtros-card .busca-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 46px;
+    height: 46px;
+}
+
+.tarefas-filtros-card .busca-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: #94a3b8;
+    pointer-events: none;
+    z-index: 2;
+    display: block;
+}
+
+.tarefas-filtros-card .busca-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 2.5rem 0 2.6rem;
+    margin: 0;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #f8fafc;
+    line-height: 1;
+    box-sizing: border-box;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.tarefas-filtros-card .busca-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--laranja);
+    box-shadow: 0 0 0 4px rgba(245, 124, 0, 0.10);
+}
+
+.tarefas-filtros-card .busca-limpar {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    background: transparent;
+    z-index: 2;
+}
+
+.tarefas-filtros-card .busca-limpar:hover {
+    background: #eef2f7;
+    text-decoration: none;
+}
+
+.tarefas-filtros-card .busca-limpar svg {
+    width: 15px;
+    height: 15px;
 }

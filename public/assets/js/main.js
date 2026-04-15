@@ -284,3 +284,115 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+document.addEventListener('click', async (event) => {
+    const botao = event.target.closest('.btn-toggle-status');
+    if (!botao) return;
+
+    event.preventDefault();
+
+    const tarefaId = botao.dataset.id;
+    if (!tarefaId) return;
+
+    botao.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('id', tarefaId);
+
+        const response = await fetch('ajax/toggle_status_tarefa.php', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Falha ao alterar status.');
+        }
+
+        const taskItem = botao.closest('.task-item');
+        if (taskItem) {
+            taskItem.classList.remove('concluida', 'atrasada', 'hoje', 'futura');
+            taskItem.classList.add(data.status_visual);
+
+            const title = data.novo_status === 'concluida'
+                ? 'Reabrir tarefa'
+                : 'Marcar como concluída';
+            botao.title = title;
+
+            if (data.novo_status === 'concluida') {
+                botao.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                `;
+
+                const badge = taskItem.querySelector('.task-badge');
+                if (badge) badge.remove();
+            } else {
+                botao.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                `;
+
+                const taskHeader = taskItem.querySelector('.task-header');
+                const existingBadge = taskItem.querySelector('.task-badge');
+
+                if (!existingBadge && taskHeader && data.status_visual !== 'futura') {
+                    const badge = document.createElement('span');
+                    badge.className = `task-badge ${data.status_visual === 'atrasada' ? 'overdue' : 'today'}`;
+
+                    if (data.status_visual === 'atrasada') {
+                        badge.innerHTML = `
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                            ${data.dias_atraso}d
+                        `;
+                    } else {
+                        badge.textContent = 'Hoje';
+                    }
+
+                    taskHeader.appendChild(badge);
+                }
+            }
+        }
+
+        // Atualiza contador do topo, se existir
+        const atualizarNumero = (labelText, delta) => {
+            const cards = document.querySelectorAll('.mini-stat');
+            cards.forEach((card) => {
+                const label = card.querySelector('.mini-stat-label');
+                const value = card.querySelector('.mini-stat-value');
+
+                if (!label || !value) return;
+
+                if (label.textContent.trim() === labelText) {
+                    const atual = parseInt(value.textContent.trim(), 10) || 0;
+                    value.textContent = Math.max(0, atual + delta);
+                }
+            });
+        };
+
+        if (data.novo_status === 'concluida') {
+            atualizarNumero('Pendentes', -1);
+            atualizarNumero('Concluídas', 1);
+            if (data.status_visual === 'atrasada') {
+                atualizarNumero('Atrasadas', -1);
+            }
+        } else {
+            atualizarNumero('Pendentes', 1);
+            atualizarNumero('Concluídas', -1);
+            if (data.status_visual === 'atrasada') {
+                atualizarNumero('Atrasadas', 1);
+            }
+        }
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        botao.disabled = false;
+    }
+});
