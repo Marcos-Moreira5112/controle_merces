@@ -183,6 +183,10 @@ function calcularDias($prazo) {
 $diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 $meses = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 $dataFormatada = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[date('n')] . ' de ' . date('Y');
+$pageTitle = 'Dashboard';
+$activePage = 'dashboard';
+$nomeUsuario = $nome_usuario;
+$cargoUsuario = $cargo;
 ?>
 
 <!DOCTYPE html>
@@ -195,25 +199,7 @@ $dataFormatada = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[dat
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="dashboard-page">
-    <header>
-        <div class="header-content">
-            <div>
-                <h1>Dashboard</h1>
-                <p>Óticas Mercês • <?= htmlspecialchars($nome_usuario) ?>
-                    <span class="badge-cargo <?= $cargo ?>">
-                        <?= ucfirst($cargo) ?>
-                    </span>
-                </p>
-            </div>
-            <div class="header-actions">
-                <a href="tarefas.php" class="btn-gerenciar">📝 Tarefas</a>
-                <?php if ($cargo === 'administrador'): ?>
-                    <a href="gerenciar_usuarios.php" class="btn-gerenciar">👥 Usuários</a>
-                <?php endif; ?>
-                <a href="logout.php" class="btn-logout">Sair</a>
-            </div>
-        </div>
-    </header>
+    <?php include __DIR__ . '/includes/partials/header.php'; ?>
 
     <main class="dashboard-container">
 

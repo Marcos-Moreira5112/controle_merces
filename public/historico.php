@@ -218,6 +218,8 @@ function formatarDataGrupo($data) {
         return 'Arquivadas em ' . $dataObj->format('d/m/Y');
     }
 }
+$pageTitle = 'Histórico';
+$activePage = 'historico';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -234,56 +236,7 @@ function formatarDataGrupo($data) {
     <link rel="stylesheet" href="assets/css/historico.css">
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <div>
-                <h1>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    Histórico
-                </h1>
-                <p>Óticas Mercês • <?= htmlspecialchars($nomeUsuario) ?>
-                    <span class="badge-cargo <?= $cargoUsuario ?>"><?= ucfirst($cargoUsuario) ?></span>
-                </p>
-            </div>
-            <div class="header-actions">
-                <a href="dashboard.php" class="btn-nav">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    Dashboard
-                </a>
-                <a href="tarefas.php" class="btn-nav">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-                        <rect x="9" y="3" width="6" height="4" rx="1"/>
-                    </svg>
-                    Tarefas
-                </a>
-                <?php if ($cargoUsuario === 'administrador'): ?>
-                    <a href="gerenciar_usuarios.php" class="btn-nav">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                        </svg>
-                        Usuários
-                    </a>
-                <?php endif; ?>
-                <a href="logout.php" class="btn-logout">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                        <polyline points="16 17 21 12 16 7"/>
-                        <line x1="21" y1="12" x2="9" y2="12"/>
-                    </svg>
-                    Sair
-                </a>
-            </div>
-        </div>
-    </header>
+    <?php include __DIR__ . '/includes/partials/header.php'; ?>
 
     <!-- Mensagens de feedback -->
     <?php if ($mensagem): ?>

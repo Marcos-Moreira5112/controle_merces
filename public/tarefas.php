@@ -98,6 +98,8 @@ $contadorAtrasadas = $classificacao['contadorAtrasadas'];
 $contadorHoje = $classificacao['contadorHoje'];
 $totalFiltrado = $classificacao['totalFiltrado'];
 $filtrosAtivos = filtrosDeTarefasEstaoAtivos($filtros);
+$pageTitle = 'Tarefas';
+$activePage = 'tarefas';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -109,46 +111,8 @@ $filtrosAtivos = filtrosDeTarefasEstaoAtivos($filtros);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="tarefas-page">
-    <header>
-        <div class="header-content">
-            <div>
-                <h1>Tarefas</h1>
-                <p>Óticas Mercês • <?= htmlspecialchars($nomeUsuario) ?> 
-                    <span class="badge-cargo <?= $cargoUsuario ?>">
-                        <?= ucfirst($cargoUsuario) ?>
-                    </span>
-                </p>
-            </div>
-            <div class="header-actions">
-                <a href="dashboard.php" class="btn-gerenciar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    Dashboard
-                </a>
-                <?php if ($cargoUsuario === 'administrador'): ?>
-                    <a href="gerenciar_usuarios.php" class="btn-gerenciar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                        </svg>
-                        Usuários
-                    </a>
-                <?php endif; ?>
-                <a href="historico.php" class="btn-gerenciar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    Histórico
-                </a>
-                <a href="logout.php" class="btn-logout">Sair</a>
-            </div>
-        </div>
-    </header>
-
+    <body class="tarefas-page">
+    <?php include __DIR__ . '/includes/partials/header.php'; ?>
     <!-- Toast de mensagem (flash) -->
     <?php if ($mensagem): ?>
         <div class="toast <?= $tipo_mensagem ?>">
