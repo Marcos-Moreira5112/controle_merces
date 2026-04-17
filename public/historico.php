@@ -481,5 +481,6 @@ $activePage = 'historico';
             }, 4000);
         }
     </script>
+    <script src="assets/js/main.js"></script>
 </body>
 </html>

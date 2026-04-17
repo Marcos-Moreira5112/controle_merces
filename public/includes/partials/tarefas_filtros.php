@@ -6,7 +6,7 @@
 
 <div class="tarefas-filtros-card">
     <div class="tarefas-filtros-top">
-        <form method="GET" class="filtro-busca-form">
+        <form method="GET" class="filtro-busca-form js-filtros-form">
             <input type="hidden" name="status" value="<?= htmlspecialchars($filtro_status) ?>">
             <input type="hidden" name="tipo" value="<?= htmlspecialchars($filtro_tipo) ?>">
             <input type="hidden" name="usuario" value="<?= htmlspecialchars($filtro_usuario) ?>">
@@ -101,7 +101,7 @@
             <?php if (!empty($usuariosFiltro)): ?>
                 <div class="filtro-select-group">
                     <span class="filtros-label">Usuário</span>
-                    <select class="filtro-select" onchange="window.location.href=this.value">
+                    <select class="filtro-select js-filtro-select">
                         <option value="<?= buildFilterUrl(['usuario' => 'todos']) ?>" <?= $filtro_usuario === 'todos' ? 'selected' : '' ?>>
                             Todos
                         </option>
@@ -116,7 +116,7 @@
 
             <div class="filtro-select-group">
                 <span class="filtros-label">Ordenar</span>
-                <select class="filtro-select" onchange="window.location.href=this.value">
+                <select class="filtro-select js-filtro-select">
                     <option value="<?= buildFilterUrl(['ordenar' => 'vencimento_asc']) ?>" <?= $ordenar_por === 'vencimento_asc' ? 'selected' : '' ?>>
                         Vencimento ↑
                     </option>

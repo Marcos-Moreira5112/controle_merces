@@ -1818,3 +1818,129 @@ a.action-btn.btn-delete:hover svg {
     width: 15px;
     height: 15px;
 }
+
+.site-header {
+    background-color: var(--azul-marinho);
+    color: var(--branco);
+    padding: 1.2rem 1rem;
+    position: relative;
+    z-index: 20;
+}
+
+.site-header .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 1rem;
+}
+
+.header-brand h1 {
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+.header-brand p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin: 0.25rem 0 0;
+}
+
+.header-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.menu-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+    padding: 0;
+}
+
+.menu-toggle:hover {
+    background: rgba(255,255,255,0.14);
+}
+
+.menu-toggle span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: white;
+    border-radius: 999px;
+}
+
+.header-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    min-width: 240px;
+    background: white;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    padding: 0.75rem;
+    display: none;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.header-menu.open .header-dropdown {
+    display: flex;
+}
+
+.header-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    color: var(--cinza-texto);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.header-dropdown a:hover {
+    background: #f8fafc;
+    text-decoration: none;
+}
+
+.header-dropdown a.active {
+    background: #fff7ed;
+    color: var(--laranja);
+}
+
+.header-dropdown .btn-logout {
+    background: #fef2f2;
+    color: var(--vermelho);
+}
+
+.header-dropdown .btn-logout:hover {
+    background: #fee2e2;
+}
+
+.header-dropdown svg {
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .site-header .header-content {
+        align-items: flex-start;
+    }
+
+    .header-dropdown {
+        min-width: min(92vw, 320px);
+    }
+}

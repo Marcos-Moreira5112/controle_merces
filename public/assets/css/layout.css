@@ -14,8 +14,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: var(--container-width);
 }
 
 header h1 {
@@ -67,7 +66,7 @@ section {
 }
 
 .layout {
-    max-width: 1100px;
+    max-width: var(--container-width);
     margin: 0 auto;
 }
 

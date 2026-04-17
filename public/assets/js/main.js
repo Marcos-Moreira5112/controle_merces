@@ -1,7 +1,64 @@
 console.log("main.js carregado corretamente");
 
-document.addEventListener('DOMContentLoaded', () => {
+function getTarefasContainer() {
+    return document.querySelector('.tarefas-container');
+}
 
+async function carregarPagina(url) {
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Falha ao carregar a página');
+        }
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const novoContainer = doc.querySelector('.tarefas-container');
+        if (!novoContainer) {
+            throw new Error('Container não encontrado');
+        }
+
+        const containerAtual = getTarefasContainer();
+        if (!containerAtual) {
+            window.location.href = url;
+            return;
+        }
+
+        containerAtual.innerHTML = novoContainer.innerHTML;
+        document.title = doc.title || document.title;
+        window.history.pushState({}, '', url);
+    } catch (error) {
+        window.location.href = url;
+    }
+}
+
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function atualizarContadores() {
+    document.querySelectorAll('.tasks-section').forEach(section => {
+        const lista = section.querySelector('.tasks-list');
+        const contador = section.querySelector('.section-count');
+
+        if (!lista || !contador) return;
+
+        const tarefas = lista.querySelectorAll('.task-item:not(.arquivando)');
+        contador.textContent = tarefas.length;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════════════════════
     // MODAL DE OBSERVAÇÕES
     // ═══════════════════════════════════════════════════════════════
@@ -10,46 +67,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const tarefaIdInput = document.getElementById('modalTarefaId');
     const btnFechar = document.getElementById('fecharModal');
     const btnCancelar = document.getElementById('cancelarModal');
-    const modalOverlay = document.querySelector('.modal-overlay');
 
-    // Abrir modal
-    document.querySelectorAll('.btn-observacoes').forEach(botao => {
-        botao.addEventListener('click', () => {
-            const id = botao.dataset.id;
-            const observacoes = botao.dataset.observacoes || '';
+    const fecharModal = () => {
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    };
 
-            tarefaIdInput.value = id;
-            textarea.value = observacoes;
+    // Abrir modal (delegado)
+    document.addEventListener('click', (event) => {
+        const botaoObservacoes = event.target.closest('.btn-observacoes');
+        if (!botaoObservacoes) return;
 
-            modal.classList.remove('hidden');
-        });
+        const id = botaoObservacoes.dataset.id;
+        const observacoes = botaoObservacoes.dataset.observacoes || '';
+
+        if (tarefaIdInput) tarefaIdInput.value = id;
+        if (textarea) textarea.value = observacoes;
+        if (modal) modal.classList.remove('hidden');
     });
 
-    // Fechar modal - botão X
-    if (btnFechar) {
-        btnFechar.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-    }
+    // Fechar modal
+    if (btnFechar) btnFechar.addEventListener('click', fecharModal);
+    if (btnCancelar) btnCancelar.addEventListener('click', fecharModal);
 
-    // Fechar modal - botão Cancelar
-    if (btnCancelar) {
-        btnCancelar.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-    }
+    document.addEventListener('click', (event) => {
+        if (event.target.classList.contains('modal-overlay')) {
+            fecharModal();
+        }
+    });
 
-    // Fechar modal - clicando no overlay
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-    }
-
-    // Fechar modal - tecla ESC
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-            modal.classList.add('hidden');
+            fecharModal();
         }
     });
 
@@ -57,18 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // BOTÕES DE DATA RÁPIDA
     // ═══════════════════════════════════════════════════════════════
     const inputPrazo = document.getElementById('prazo');
-    const botoesData = document.querySelectorAll('.date-shortcut-btn');
-
-    function formatDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
 
     function updateActiveButton() {
         if (!inputPrazo) return;
-        
+
+        const botoesData = document.querySelectorAll('.date-shortcut-btn');
         const selectedDate = inputPrazo.value;
         const hoje = formatDate(new Date());
         const amanha = formatDate(new Date(Date.now() + 86400000));
@@ -76,35 +119,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         botoesData.forEach(btn => {
             btn.classList.remove('active');
-            const days = parseInt(btn.dataset.days);
-            let btnDate;
-            
+            const days = parseInt(btn.dataset.days, 10);
+            let btnDate = '';
+
             if (days === 0) btnDate = hoje;
             else if (days === 1) btnDate = amanha;
             else if (days === 7) btnDate = semana;
-            
+
             if (selectedDate === btnDate) {
                 btn.classList.add('active');
             }
         });
     }
 
-    botoesData.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const days = parseInt(btn.dataset.days);
-            const date = new Date();
-            date.setDate(date.getDate() + days);
-            
-            if (inputPrazo) {
-                inputPrazo.value = formatDate(date);
-                updateActiveButton();
-            }
-        });
+    document.addEventListener('click', (event) => {
+        const btn = event.target.closest('.date-shortcut-btn');
+        if (!btn) return;
+
+        const days = parseInt(btn.dataset.days, 10);
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+
+        if (inputPrazo) {
+            inputPrazo.value = formatDate(date);
+            updateActiveButton();
+        }
     });
 
-    // Atualizar botão ativo quando mudar a data manualmente
     if (inputPrazo) {
         inputPrazo.addEventListener('change', updateActiveButton);
+        updateActiveButton();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -117,7 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let toastTimeout = null;
 
     function mostrarToastDesfazer(id, elemento) {
-        // Limpar timeout anterior se existir
+        if (!toastDesfazer) return;
+
         if (toastTimeout) {
             clearTimeout(toastTimeout);
         }
@@ -125,17 +170,15 @@ document.addEventListener('DOMContentLoaded', () => {
         tarefaArquivadaId = id;
         tarefaArquivadaElement = elemento;
 
-        // Resetar animação da barra de progresso
         const progress = toastDesfazer.querySelector('.toast-progress');
         if (progress) {
             progress.style.animation = 'none';
-            progress.offsetHeight; // Trigger reflow
+            progress.offsetHeight;
             progress.style.animation = 'progressShrink 5s linear forwards';
         }
 
         toastDesfazer.classList.remove('hidden');
 
-        // Auto-esconder após 5 segundos
         toastTimeout = setTimeout(() => {
             esconderToastDesfazer(false);
         }, 5000);
@@ -147,13 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
             toastTimeout = null;
         }
 
-        toastDesfazer.classList.add('hidden');
+        if (toastDesfazer) {
+            toastDesfazer.classList.add('hidden');
+        }
 
         if (!desfazer && tarefaArquivadaElement) {
-            // Remover elemento definitivamente se não desfez
             tarefaArquivadaElement.remove();
-            
-            // Atualizar contadores na página (opcional - pode dar reload)
             atualizarContadores();
         }
 
@@ -161,57 +203,42 @@ document.addEventListener('DOMContentLoaded', () => {
         tarefaArquivadaElement = null;
     }
 
-    function atualizarContadores() {
-        // Atualizar contagem de tarefas nas seções
-        document.querySelectorAll('.tasks-section').forEach(section => {
-            const lista = section.querySelector('.tasks-list');
-            const contador = section.querySelector('.section-count');
-            if (lista && contador) {
-                const tarefas = lista.querySelectorAll('.task-item:not(.arquivando)');
-                contador.textContent = tarefas.length;
-            }
-        });
-    }
+    document.addEventListener('click', async (event) => {
+        const btnArquivar = event.target.closest('.btn-arquivar');
+        if (!btnArquivar) return;
 
-    // Botões de arquivar
-    document.querySelectorAll('.btn-arquivar').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            
-            const id = btn.dataset.id;
-            const taskItem = btn.closest('.task-item');
+        event.preventDefault();
 
-            try {
-                // Fazer requisição AJAX para arquivar
-                const response = await fetch('ajax/arquivar_tarefa.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ id: id })
-                });
+        const id = btnArquivar.dataset.id;
+        const taskItem = btnArquivar.closest('.task-item');
 
-                const data = await response.json();
+        try {
+            const response = await fetch('ajax/arquivar_tarefa.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id })
+            });
 
-                if (data.success) {
-                    // Animar saída do elemento
+            const data = await response.json();
+
+            if (data.success) {
+                if (taskItem) {
                     taskItem.classList.add('arquivando');
-                    
-                    // Mostrar toast após animação começar
                     setTimeout(() => {
                         mostrarToastDesfazer(id, taskItem);
                     }, 150);
-                } else {
-                    alert('Erro ao arquivar tarefa: ' + (data.message || 'Erro desconhecido'));
                 }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao arquivar tarefa. Tente novamente.');
+            } else {
+                alert('Erro ao arquivar tarefa: ' + (data.message || 'Erro desconhecido'));
             }
-        });
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao arquivar tarefa. Tente novamente.');
+        }
     });
 
-    // Botão de desfazer
     if (btnDesfazerAction) {
         btnDesfazerAction.addEventListener('click', async () => {
             if (!tarefaArquivadaId) return;
@@ -228,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
 
                 if (data.success) {
-                    // Restaurar elemento
                     if (tarefaArquivadaElement) {
                         tarefaArquivadaElement.classList.remove('arquivando');
                     }
@@ -246,16 +272,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════════════════════
     // CONFIRMAÇÃO PARA EXCLUSÃO PERMANENTE (histórico)
     // ═══════════════════════════════════════════════════════════════
-    document.querySelectorAll('a[href*="acao=deletar"]').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            
-            const confirmacao = confirm('⚠️ ATENÇÃO! Isso excluirá a tarefa PERMANENTEMENTE.\n\nEsta ação não pode ser desfeita!\n\nDeseja continuar?');
-            
-            if (confirmacao) {
-                window.location.href = link.href;
-            }
-        });
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href*="acao=deletar"]');
+        if (!link) return;
+
+        event.preventDefault();
+
+        const confirmacao = confirm(
+            '⚠️ ATENÇÃO! Isso excluirá a tarefa PERMANENTEMENTE.\n\n' +
+            'Esta ação não pode ser desfeita!\n\n' +
+            'Deseja continuar?'
+        );
+
+        if (confirmacao) {
+            window.location.href = link.href;
+        }
     });
 
     // ═══════════════════════════════════════════════════════════════
@@ -271,6 +302,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 4000);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // MENU HAMBÚRGUER DO HEADER
+    // ═══════════════════════════════════════════════════════════════
+    const menuToggle = document.getElementById('menuToggle');
+    const headerMenu = document.querySelector('.header-menu');
+
+    if (menuToggle && headerMenu) {
+        const closeMenu = () => {
+            headerMenu.classList.remove('open');
+            menuToggle.setAttribute('aria-expanded', 'false');
+        };
+
+        menuToggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = headerMenu.classList.toggle('open');
+            menuToggle.setAttribute('aria-expanded', String(isOpen));
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!headerMenu.contains(event.target) && !menuToggle.contains(event.target)) {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeMenu();
+            }
+        });
+    }
 });
 
 // Adicionar keyframe para slideOut se não existir
@@ -285,6 +346,9 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// ═══════════════════════════════════════════════════════════════
+// TOGGLE DE STATUS VIA AJAX
+// ═══════════════════════════════════════════════════════════════
 document.addEventListener('click', async (event) => {
     const botao = event.target.closest('.btn-toggle-status');
     if (!botao) return;
@@ -361,7 +425,6 @@ document.addEventListener('click', async (event) => {
             }
         }
 
-        // Atualiza contador do topo, se existir
         const atualizarNumero = (labelText, delta) => {
             const cards = document.querySelectorAll('.mini-stat');
             cards.forEach((card) => {
@@ -395,4 +458,41 @@ document.addEventListener('click', async (event) => {
     } finally {
         botao.disabled = false;
     }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FILTROS E ORDENAÇÃO SEM RELOAD
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('.tarefas-filtros-card .filtro-busca-form');
+    if (!form) return;
+
+    event.preventDefault();
+
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+
+    carregarPagina(`${window.location.pathname}?${params.toString()}`);
+});
+
+document.addEventListener('change', (event) => {
+    const select = event.target.closest('.tarefas-filtros-card .filtro-select');
+    if (!select) return;
+
+    const url = select.value;
+    if (url) {
+        carregarPagina(url);
+    }
+});
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('.tarefas-filtros-card a.filtro-btn, .tarefas-filtros-card a.btn-limpar-filtros, .tarefas-filtros-card a.busca-limpar');
+    if (!link) return;
+
+    event.preventDefault();
+    carregarPagina(link.href);
+});
+
+window.addEventListener('popstate', () => {
+    carregarPagina(window.location.href);
 });
