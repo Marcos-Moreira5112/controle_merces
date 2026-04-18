@@ -67,6 +67,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+$toggleQueryString = montarQueryStringFiltros($filtros);
+
+if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
+    $tarefa_id = (int) $_GET['id'];
+    $tarefaCheck = buscarPermissaoTarefa($pdo, $tarefa_id);
+
+    $podeAlterar = $cargoUsuario === 'administrador'
+        || ($tarefaCheck && ($tarefaCheck['usuario_id'] == $usuario_id || $tarefaCheck['atribuida_para'] == $usuario_id));
+
+    if ($podeAlterar) {
+        alternarStatusTarefa($pdo, $tarefa_id);
+        $_SESSION['mensagem'] = 'Status da tarefa atualizado!';
+        $_SESSION['tipo_mensagem'] = 'sucesso';
+    }
+
+    header('Location: tarefas.php?' . $toggleQueryString);
+    exit;
+}
+
 $hoje = new DateTime('today');
 processarRecorrenciaTarefasFixas($pdo, $usuario_id, $hoje);
 
@@ -358,8 +377,8 @@ $activePage = 'tarefas';
                                 <?php foreach ($tarefasNormais as $tarefa): ?>
                                     <div class="task-item <?= $tarefa['status_visual'] ?>" data-task-id="<?= $tarefa['id'] ?>">
                                         <!-- Checkbox -->
-                                        <button
-                                            type="button"
+                                        <a
+                                            href="?acao=toggle&id=<?= $tarefa['id'] ?>&<?= htmlspecialchars($toggleQueryString) ?>"
                                             class="task-checkbox btn-toggle-status"
                                             data-id="<?= $tarefa['id'] ?>"
                                             title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>"
@@ -373,7 +392,7 @@ $activePage = 'tarefas';
                                                     <circle cx="12" cy="12" r="10"/>
                                                 </svg>
                                             <?php endif; ?>
-                                        </button>
+                                        </a>
                                         
                                         <!-- Content -->
                                         <div class="task-content">
@@ -399,6 +418,7 @@ $activePage = 'tarefas';
                                                         <line x1="8" y1="2" x2="8" y2="6"/>
                                                         <line x1="3" y1="10" x2="21" y2="10"/>
                                                     </svg>
+                                                    <?= htmlspecialchars(date('d/m/Y', strtotime($tarefa['prazo']))) ?>
                                                 </span>
                                                 
                                                 <?php if ($cargoUsuario !== 'funcionario'): ?>
@@ -495,8 +515,8 @@ $activePage = 'tarefas';
                                 <?php foreach ($tarefasFixas as $tarefa): ?>
                                     <div class="task-item <?= $tarefa['status_visual'] ?>" data-task-id="<?= $tarefa['id'] ?>">
                                         <!-- Checkbox -->
-                                        <button
-                                            type="button"
+                                        <a
+                                            href="?acao=toggle&id=<?= $tarefa['id'] ?>&<?= htmlspecialchars($toggleQueryString) ?>"
                                             class="task-checkbox btn-toggle-status"
                                             data-id="<?= $tarefa['id'] ?>"
                                             title="<?= $tarefa['status'] === 'pendente' ? 'Marcar como concluída' : 'Reabrir tarefa' ?>"
@@ -510,7 +530,7 @@ $activePage = 'tarefas';
                                                     <circle cx="12" cy="12" r="10"/>
                                                 </svg>
                                             <?php endif; ?>
-                                        </button>
+                                        </a>
                                         
                                         <!-- Content -->
                                         <div class="task-content">
@@ -541,6 +561,7 @@ $activePage = 'tarefas';
                                                         <line x1="8" y1="2" x2="8" y2="6"/>
                                                         <line x1="3" y1="10" x2="21" y2="10"/>
                                                     </svg>
+                                                    <?= htmlspecialchars(date('d/m/Y', strtotime($tarefa['prazo']))) ?>
                                                 </span>
                                                 
                                                 <?php if ($cargoUsuario !== 'funcionario'): ?>

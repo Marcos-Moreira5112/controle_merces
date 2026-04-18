@@ -4,7 +4,7 @@ function getTarefasContainer() {
     return document.querySelector('.tarefas-container');
 }
 
-async function carregarPagina(url) {
+async function carregarPagina(url, { pushState = true } = {}) {
     try {
         const response = await fetch(url, {
             headers: {
@@ -33,7 +33,11 @@ async function carregarPagina(url) {
 
         containerAtual.innerHTML = novoContainer.innerHTML;
         document.title = doc.title || document.title;
-        window.history.pushState({}, '', url);
+
+        const targetUrl = new URL(url, window.location.href).href;
+        if (pushState && window.location.href !== targetUrl) {
+            window.history.pushState({}, '', url);
+        }
     } catch (error) {
         window.location.href = url;
     }
@@ -106,9 +110,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════════════════════
     // BOTÕES DE DATA RÁPIDA
     // ═══════════════════════════════════════════════════════════════
-    const inputPrazo = document.getElementById('prazo');
+    function getInputPrazo() {
+        return document.getElementById('prazo');
+    }
 
     function updateActiveButton() {
+        const inputPrazo = getInputPrazo();
         if (!inputPrazo) return;
 
         const botoesData = document.querySelectorAll('.date-shortcut-btn');
@@ -139,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const days = parseInt(btn.dataset.days, 10);
         const date = new Date();
         date.setDate(date.getDate() + days);
+        const inputPrazo = getInputPrazo();
 
         if (inputPrazo) {
             inputPrazo.value = formatDate(date);
@@ -146,8 +154,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    if (inputPrazo) {
-        inputPrazo.addEventListener('change', updateActiveButton);
+    document.addEventListener('change', (event) => {
+        if (event.target.id === 'prazo') {
+            updateActiveButton();
+        }
+    });
+
+    if (getInputPrazo()) {
         updateActiveButton();
     }
 
@@ -377,6 +390,10 @@ document.addEventListener('click', async (event) => {
         }
 
         const taskItem = botao.closest('.task-item');
+        const statusAnterior = taskItem && taskItem.classList.contains('atrasada')
+            ? 'atrasada'
+            : null;
+
         if (taskItem) {
             taskItem.classList.remove('concluida', 'atrasada', 'hoje', 'futura');
             taskItem.classList.add(data.status_visual);
@@ -443,7 +460,7 @@ document.addEventListener('click', async (event) => {
         if (data.novo_status === 'concluida') {
             atualizarNumero('Pendentes', -1);
             atualizarNumero('Concluídas', 1);
-            if (data.status_visual === 'atrasada') {
+            if (statusAnterior === 'atrasada') {
                 atualizarNumero('Atrasadas', -1);
             }
         } else {
@@ -494,5 +511,5 @@ document.addEventListener('click', (event) => {
 });
 
 window.addEventListener('popstate', () => {
-    carregarPagina(window.location.href);
+    carregarPagina(window.location.href, { pushState: false });
 });

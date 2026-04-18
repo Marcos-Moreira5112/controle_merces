@@ -1573,11 +1573,22 @@ a.action-btn.btn-delete:hover svg {
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease, transform .15s ease;
 }
 
-.btn-limpar-filtros:hover {
+.btn-limpar-filtros.is-active:hover {
     background: #eef2f7;
     text-decoration: none;
+}
+
+.btn-limpar-filtros.is-inactive {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: default;
+}
+
+.btn-limpar-filtros.is-active {
+    opacity: 1;
 }
 
 .btn-limpar-filtros svg {

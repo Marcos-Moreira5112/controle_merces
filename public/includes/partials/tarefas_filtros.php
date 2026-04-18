@@ -32,22 +32,24 @@
                             <line x1="18" y1="6" x2="6" y2="18"/>
                             <line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
-                    </a>
+                        </a>
                 <?php endif; ?>
             </div>
         </form>
 
         <div class="tarefas-filtros-actions">
-            <?php if ($filtrosAtivos): ?>
-                <a href="tarefas.php" class="btn-limpar-filtros">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M3 6h18"/>
-                        <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                    </svg>
-                    Limpar filtros
-                </a>
-            <?php endif; ?>
+            <a
+                href="tarefas.php"
+                class="btn-limpar-filtros <?= $filtrosAtivos ? 'is-active' : 'is-inactive' ?>"
+                <?= $filtrosAtivos ? '' : 'aria-disabled="true" tabindex="-1"' ?>
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M3 6h18"/>
+                    <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                </svg>
+                Limpar filtros
+            </a>
         </div>
     </div>
 
