@@ -45,7 +45,7 @@ $cargoUsuario = $cargoUsuario ?? 'funcionario';
 
                 <a href="tarefas.php" class="btn-gerenciar <?= $activePage === 'tarefas' ? 'active' : '' ?>">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
                         <rect x="9" y="3" width="6" height="4" rx="1"/>
                         <path d="M9 12l2 2 4-4"/>
                     </svg>
@@ -60,12 +60,20 @@ $cargoUsuario = $cargoUsuario ?? 'funcionario';
                     Histórico
                 </a>
 
+                <a href="conta.php" class="btn-gerenciar <?= $activePage === 'conta' ? 'active' : '' ?>">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Minha Conta
+                </a>
+
                 <?php if ($cargoUsuario === 'administrador'): ?>
                     <a href="gerenciar_usuarios.php" class="btn-gerenciar <?= $activePage === 'usuarios' ? 'active' : '' ?>">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                             <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
                         </svg>
                         Usuários
                     </a>

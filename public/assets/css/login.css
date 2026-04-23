@@ -309,6 +309,45 @@
     color: var(--cinza-secundario);
 }
 
+.auth-wrapper {
+    min-height: 660px;
+}
+
+.auth-switch {
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--cinza-secundario);
+    font-size: 0.95rem;
+}
+
+.auth-switch p {
+    margin: 0;
+}
+
+.auth-switch a {
+    color: var(--laranja);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.auth-switch a:hover {
+    text-decoration: underline;
+}
+
+.login-success {
+    padding: 1rem;
+    border-radius: 12px;
+    color: #166534;
+    background: #ecfdf3;
+    border: 1px solid #bbf7d0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
 /* =========================
    RESPONSIVE
 ========================= */

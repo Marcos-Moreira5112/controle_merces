@@ -17,15 +17,17 @@ function classificarTarefasParaExibicao(array $tarefas, string $filtroStatus, Da
             $statusVisual = 'concluida';
             $contadorConcluidas++;
         } else {
-            $contadorPendentes++;
-
             if ($prazoTarefa < $hoje) {
                 $statusVisual = 'atrasada';
                 $tarefa['dias_atraso'] = $hoje->diff($prazoTarefa)->days;
                 $contadorAtrasadas++;
-            } elseif ($prazoTarefa == $hoje) {
-                $statusVisual = 'hoje';
-                $contadorHoje++;
+            } else {
+                $contadorPendentes++;
+
+                if ($prazoTarefa == $hoje) {
+                    $statusVisual = 'hoje';
+                    $contadorHoje++;
+                }
             }
         }
 

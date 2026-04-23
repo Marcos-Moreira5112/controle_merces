@@ -13,19 +13,41 @@ if (!isset($_SESSION['usuario_id'])) {
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
 
-$usuario_id = $_SESSION['usuario_id'];
+function bindNullableInt(PDOStatement $stmt, string $param, ?int $value): void
+{
+    if ($value === null) {
+        $stmt->bindValue($param, null, PDO::PARAM_NULL);
+        return;
+    }
 
-// Buscar dados do usuário logado
+    $stmt->bindValue($param, $value, PDO::PARAM_INT);
+}
+
+function redirecionarComMensagem(string $mensagem, string $tipo = 'erro'): void
+{
+    $_SESSION['mensagem'] = $mensagem;
+    $_SESSION['tipo_mensagem'] = $tipo;
+    header('Location: gerenciar_usuarios.php');
+    exit;
+}
+
+$usuario_id = (int) $_SESSION['usuario_id'];
+
 $sqlUsuario = "SELECT nome, cargo FROM usuarios WHERE id = :usuario_id";
 $stmtUsuario = $pdo->prepare($sqlUsuario);
-$stmtUsuario->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+$stmtUsuario->bindValue(':usuario_id', $usuario_id, PDO::PARAM_INT);
 $stmtUsuario->execute();
 $usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
+
+if (!$usuarioLogado) {
+    session_destroy();
+    header('Location: login.php');
+    exit;
+}
 
 $nomeUsuario = $usuarioLogado['nome'];
 $cargoUsuario = $usuarioLogado['cargo'];
 
-// Só administrador pode acessar
 if ($cargoUsuario !== 'administrador') {
     $_SESSION['mensagem'] = 'Você não tem permissão para acessar esta página.';
     $_SESSION['tipo_mensagem'] = 'erro';
@@ -33,122 +55,157 @@ if ($cargoUsuario !== 'administrador') {
     exit;
 }
 
-// Mensagens flash
 $mensagem = $_SESSION['mensagem'] ?? null;
 $tipo_mensagem = $_SESSION['tipo_mensagem'] ?? null;
 unset($_SESSION['mensagem'], $_SESSION['tipo_mensagem']);
 
-// Processar ações POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
-    if ($acao === 'criar') {
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $senha = $_POST['senha'] ?? '';
-        $cargo = $_POST['cargo'] ?? 'funcionario';
-        $supervisor_id = !empty($_POST['supervisor_id']) ? (int)$_POST['supervisor_id'] : null;
+    try {
+        if ($acao === 'criar') {
+            $nome = trim($_POST['nome'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $senha = $_POST['senha'] ?? '';
+            $cargo = $_POST['cargo'] ?? 'funcionario';
+            $supervisor_id = !empty($_POST['supervisor_id']) ? (int) $_POST['supervisor_id'] : null;
 
-        if ($cargo !== 'funcionario') {
-            $supervisor_id = null;
-        }
+            if ($cargo !== 'funcionario') {
+                $supervisor_id = null;
+            }
 
-        if ($nome === '' || $email === '' || $senha === '') {
-            $_SESSION['mensagem'] = 'Nome, e-mail e senha são obrigatórios!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $_SESSION['mensagem'] = 'E-mail inválido!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } elseif (strlen($senha) < 6) {
-            $_SESSION['mensagem'] = 'A senha deve ter pelo menos 6 caracteres!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } else {
+            if ($nome === '' || $email === '' || $senha === '') {
+                redirecionarComMensagem('Nome, e-mail e senha são obrigatórios!');
+            }
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                redirecionarComMensagem('E-mail inválido!');
+            }
+
+            if (strlen($senha) < 6) {
+                redirecionarComMensagem('A senha deve ter pelo menos 6 caracteres!');
+            }
+
+            $stmtExiste = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = :email");
+            $stmtExiste->bindValue(':email', $email);
+            $stmtExiste->execute();
+
+            if ((int) $stmtExiste->fetchColumn() > 0) {
+                redirecionarComMensagem('Já existe um usuário cadastrado com este e-mail.');
+            }
+
             $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-            
-            $sql = "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo) 
+            $sql = "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo)
                     VALUES (:nome, :email, :senha, :cargo, :supervisor_id, 1)";
             $stmt = $pdo->prepare($sql);
-            $stmt->bindParam(':nome', $nome);
-            $stmt->bindParam(':email', $email);
-            $stmt->bindParam(':senha', $senhaHash);
-            $stmt->bindParam(':cargo', $cargo);
-            $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT);
+            $stmt->bindValue(':nome', $nome);
+            $stmt->bindValue(':email', $email);
+            $stmt->bindValue(':senha', $senhaHash);
+            $stmt->bindValue(':cargo', $cargo);
+            bindNullableInt($stmt, ':supervisor_id', $supervisor_id);
             $stmt->execute();
 
-            $_SESSION['mensagem'] = 'Usuário criado com sucesso!';
-            $_SESSION['tipo_mensagem'] = 'sucesso';
-        }
-    } elseif ($acao === 'editar') {
-        $id = (int)$_POST['id'];
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $novaSenha = $_POST['nova_senha'] ?? '';
-        $cargo = $_POST['cargo'] ?? 'funcionario';
-        $supervisor_id = !empty($_POST['supervisor_id']) ? (int)$_POST['supervisor_id'] : null;
-
-        if ($cargo !== 'funcionario') {
-            $supervisor_id = null;
+            redirecionarComMensagem('Usuário criado com sucesso!', 'sucesso');
         }
 
-        if ($nome === '' || $email === '') {
-            $_SESSION['mensagem'] = 'Nome e e-mail são obrigatórios!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $_SESSION['mensagem'] = 'E-mail inválido!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } elseif ($novaSenha !== '' && strlen($novaSenha) < 6) {
-            $_SESSION['mensagem'] = 'A nova senha deve ter pelo menos 6 caracteres!';
-            $_SESSION['tipo_mensagem'] = 'erro';
-        } else {
+        if ($acao === 'editar') {
+            $id = (int) ($_POST['id'] ?? 0);
+            $nome = trim($_POST['nome'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $novaSenha = $_POST['nova_senha'] ?? '';
+            $cargo = $_POST['cargo'] ?? 'funcionario';
+            $supervisor_id = !empty($_POST['supervisor_id']) ? (int) $_POST['supervisor_id'] : null;
+
+            if ($cargo !== 'funcionario') {
+                $supervisor_id = null;
+            }
+
+            if ($id <= 0) {
+                redirecionarComMensagem('Usuário inválido para edição.');
+            }
+
+            if ($nome === '' || $email === '') {
+                redirecionarComMensagem('Nome e e-mail são obrigatórios!');
+            }
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                redirecionarComMensagem('E-mail inválido!');
+            }
+
+            if ($novaSenha !== '' && strlen($novaSenha) < 6) {
+                redirecionarComMensagem('A nova senha deve ter pelo menos 6 caracteres!');
+            }
+
+            $stmtExiste = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = :email AND id != :id");
+            $stmtExiste->bindValue(':email', $email);
+            $stmtExiste->bindValue(':id', $id, PDO::PARAM_INT);
+            $stmtExiste->execute();
+
+            if ((int) $stmtExiste->fetchColumn() > 0) {
+                redirecionarComMensagem('Outro usuário já está usando este e-mail.');
+            }
+
             if ($novaSenha !== '') {
                 $senhaHash = password_hash($novaSenha, PASSWORD_DEFAULT);
-                $sql = "UPDATE usuarios SET nome = :nome, email = :email, senha = :senha, cargo = :cargo, supervisor_id = :supervisor_id WHERE id = :id";
+                $sql = "UPDATE usuarios
+                        SET nome = :nome, email = :email, senha = :senha, cargo = :cargo, supervisor_id = :supervisor_id
+                        WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
-                $stmt->bindParam(':senha', $senhaHash);
+                $stmt->bindValue(':senha', $senhaHash);
             } else {
-                $sql = "UPDATE usuarios SET nome = :nome, email = :email, cargo = :cargo, supervisor_id = :supervisor_id WHERE id = :id";
+                $sql = "UPDATE usuarios
+                        SET nome = :nome, email = :email, cargo = :cargo, supervisor_id = :supervisor_id
+                        WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
             }
-            
-            $stmt->bindParam(':nome', $nome);
-            $stmt->bindParam(':email', $email);
-            $stmt->bindParam(':cargo', $cargo);
-            $stmt->bindParam(':supervisor_id', $supervisor_id, PDO::PARAM_INT);
-            $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+            $stmt->bindValue(':nome', $nome);
+            $stmt->bindValue(':email', $email);
+            $stmt->bindValue(':cargo', $cargo);
+            bindNullableInt($stmt, ':supervisor_id', $supervisor_id);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
 
-            $_SESSION['mensagem'] = 'Usuário atualizado com sucesso!';
-            $_SESSION['tipo_mensagem'] = 'sucesso';
+            redirecionarComMensagem('Usuário atualizado com sucesso!', 'sucesso');
         }
-    } elseif ($acao === 'toggle_ativo') {
-        $id = (int)$_POST['id'];
-        $novoAtivo = (int)$_POST['novo_ativo'];
-        $sql = "UPDATE usuarios SET ativo = :ativo WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':ativo', $novoAtivo, PDO::PARAM_INT);
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        $stmt->execute();
 
-        $_SESSION['mensagem'] = $novoAtivo === 1 ? 'Usuário ativado!' : 'Usuário desativado!';
-        $_SESSION['tipo_mensagem'] = 'sucesso';
+        if ($acao === 'toggle_ativo') {
+            $id = (int) ($_POST['id'] ?? 0);
+            $novoAtivo = (int) ($_POST['novo_ativo'] ?? 0);
+
+            if ($id <= 0) {
+                redirecionarComMensagem('Usuário inválido para alteração de status.');
+            }
+
+            $sql = "UPDATE usuarios SET ativo = :ativo WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':ativo', $novoAtivo, PDO::PARAM_INT);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $stmt->execute();
+
+            redirecionarComMensagem($novoAtivo === 1 ? 'Usuário ativado!' : 'Usuário desativado!', 'sucesso');
+        }
+    } catch (PDOException $e) {
+        redirecionarComMensagem('Não foi possível salvar o usuário agora. Confira os dados e tente novamente.');
     }
 
-    header('Location: gerenciar_usuarios.php');
-    exit;
+    redirecionarComMensagem('Ação inválida.');
 }
 
-// Busca
 $busca = trim($_GET['busca'] ?? '');
 $where = "WHERE 1=1";
 $params = [];
+
 if ($busca !== '') {
     $where .= " AND (nome LIKE :busca OR email LIKE :busca OR cargo LIKE :busca)";
     $params[':busca'] = "%$busca%";
 }
 
-// Listar usuários
-$sqlUsuarios = "SELECT id, nome, email, cargo, supervisor_id, ativo, created_at 
-                FROM usuarios $where ORDER BY nome ASC";
+$sqlUsuarios = "SELECT u.id, u.nome, u.email, u.cargo, u.supervisor_id, u.ativo, u.created_at, s.nome AS supervisor_nome
+                FROM usuarios u
+                LEFT JOIN usuarios s ON s.id = u.supervisor_id
+                $where
+                ORDER BY u.nome ASC";
 $stmtUsuarios = $pdo->prepare($sqlUsuarios);
 foreach ($params as $key => $value) {
     $stmtUsuarios->bindValue($key, $value);
@@ -156,11 +213,11 @@ foreach ($params as $key => $value) {
 $stmtUsuarios->execute();
 $usuarios = $stmtUsuarios->fetchAll(PDO::FETCH_ASSOC);
 
-// Listar supervisores
 $sqlSupervisores = "SELECT id, nome FROM usuarios WHERE cargo = 'supervisor' ORDER BY nome ASC";
 $stmtSupervisores = $pdo->prepare($sqlSupervisores);
 $stmtSupervisores->execute();
 $supervisores = $stmtSupervisores->fetchAll(PDO::FETCH_ASSOC);
+
 $pageTitle = 'Usuários';
 $activePage = 'usuarios';
 ?>
@@ -180,10 +237,9 @@ $activePage = 'usuarios';
     <?php include __DIR__ . '/includes/partials/header.php'; ?>
 
     <main class="user-management-container">
-
         <?php if ($mensagem): ?>
-            <div class="mensagem <?= $tipo_mensagem ?>">
-                <?= $mensagem ?>
+            <div class="mensagem <?= htmlspecialchars($tipo_mensagem ?? 'sucesso') ?>">
+                <?= htmlspecialchars($mensagem) ?>
             </div>
         <?php endif; ?>
 
@@ -213,26 +269,16 @@ $activePage = 'usuarios';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($usuarios as $user): 
+                    <?php foreach ($usuarios as $user): ?>
+                        <?php
                         $iniciais = strtoupper(substr($user['nome'], 0, 1) . (strpos($user['nome'], ' ') ? substr(strrchr($user['nome'], ' '), 1, 1) : ''));
                         $cargoClass = strtolower($user['cargo']);
-                        
-                        $supervisorNome = '—';
-                        if ($user['supervisor_id']) {
-                            $sqlSup = "SELECT nome FROM usuarios WHERE id = :sup_id";
-                            $stmtSup = $pdo->prepare($sqlSup);
-                            $stmtSup->bindParam(':sup_id', $user['supervisor_id'], PDO::PARAM_INT);
-                            $stmtSup->execute();
-                            $sup = $stmtSup->fetch(PDO::FETCH_ASSOC);
-                            if ($sup) {
-                                $supervisorNome = htmlspecialchars($sup['nome']);
-                            }
-                        }
-                    ?>
+                        $supervisorNome = $user['supervisor_nome'] ? htmlspecialchars($user['supervisor_nome']) : '—';
+                        ?>
                         <tr>
                             <td>
                                 <div class="user-info">
-                                    <div class="avatar <?= $cargoClass ?>"><?= $iniciais ?></div>
+                                    <div class="avatar <?= htmlspecialchars($cargoClass) ?>"><?= htmlspecialchars($iniciais) ?></div>
                                     <div class="user-details">
                                         <div class="user-name"><?= htmlspecialchars($user['nome']) ?></div>
                                         <div class="user-email"><?= htmlspecialchars($user['email']) ?></div>
@@ -240,8 +286,8 @@ $activePage = 'usuarios';
                                 </div>
                             </td>
                             <td>
-                                <span class="badge-cargo <?= $cargoClass ?>">
-                                    <?= ucfirst($user['cargo']) ?>
+                                <span class="badge-cargo <?= htmlspecialchars($cargoClass) ?>">
+                                    <?= htmlspecialchars(ucfirst($user['cargo'])) ?>
                                 </span>
                             </td>
                             <td><?= $supervisorNome ?></td>
@@ -253,7 +299,17 @@ $activePage = 'usuarios';
                             </td>
                             <td>
                                 <div class="actions">
-                                    <button type="button" class="action-btn" title="Editar" onclick="abrirEditar(<?= $user['id'] ?>, '<?= addslashes($user['nome']) ?>', '<?= addslashes($user['email']) ?>', '<?= $user['cargo'] ?>', <?= $user['supervisor_id'] ?? 'null' ?>)">
+                                    <button
+                                        type="button"
+                                        class="action-btn"
+                                        title="Editar"
+                                        data-user-id="<?= (int) $user['id'] ?>"
+                                        data-user-nome="<?= htmlspecialchars($user['nome'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-user-email="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-user-cargo="<?= htmlspecialchars($user['cargo'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-user-supervisor="<?= $user['supervisor_id'] !== null ? (int) $user['supervisor_id'] : '' ?>"
+                                        onclick="abrirEditar(this)"
+                                    >
                                         <svg class="icon-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                                             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -262,9 +318,9 @@ $activePage = 'usuarios';
 
                                     <form method="POST">
                                         <input type="hidden" name="acao" value="toggle_ativo">
-                                        <input type="hidden" name="id" value="<?= $user['id'] ?>">
+                                        <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                         <input type="hidden" name="novo_ativo" value="<?= $user['ativo'] ? 0 : 1 ?>">
-                                        <button type="submit" class="action-btn" title="<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?>" onclick="return confirm('<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?> <?= addslashes($user['nome']) ?>?')">
+                                        <button type="submit" class="action-btn" title="<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?>" onclick="return confirm('<?= $user['ativo'] ? 'Desativar' : 'Ativar' ?> <?= htmlspecialchars(addslashes($user['nome']), ENT_QUOTES, 'UTF-8') ?>?')">
                                             <?php if ($user['ativo']): ?>
                                                 <svg class="icon-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -288,40 +344,52 @@ $activePage = 'usuarios';
                 </tbody>
             </table>
         </div>
-
     </main>
 
-    <!-- Modal Criar Usuário -->
     <div id="modalCriar" class="modal hidden">
-        <div class="modal-content">
-            <h3>Criar Novo Usuário</h3>
+        <div class="modal-content user-modal-content">
+            <div class="user-modal-header">
+                <h3>Criar Novo Usuário</h3>
+                <p>Cadastre um novo acesso com cargo e supervisor definidos.</p>
+            </div>
+
             <form method="POST">
                 <input type="hidden" name="acao" value="criar">
-                
-                <label>Nome Completo</label>
-                <input type="text" name="nome" required>
 
-                <label>E-mail</label>
-                <input type="email" name="email" required>
+                <div class="user-form-grid">
+                    <div class="form-field form-field-full">
+                        <label for="criarNome">Nome Completo</label>
+                        <input type="text" name="nome" id="criarNome" required>
+                    </div>
 
-                <label>Senha</label>
-                <input type="password" name="senha" required minlength="6" placeholder="Mínimo 6 caracteres">
+                    <div class="form-field form-field-full">
+                        <label for="criarEmail">E-mail</label>
+                        <input type="email" name="email" id="criarEmail" required>
+                    </div>
 
-                <label>Cargo</label>
-                <select name="cargo" id="cargoCriar" onchange="toggleSupervisor('cargoCriar', 'divSupervisorCriar')">
-                    <option value="funcionario">Funcionário</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="administrador">Administrador</option>
-                </select>
+                    <div class="form-field">
+                        <label for="criarSenha">Senha</label>
+                        <input type="password" name="senha" id="criarSenha" required minlength="6" placeholder="Mínimo 6 caracteres">
+                    </div>
 
-                <div id="divSupervisorCriar">
-                    <label>Supervisor</label>
-                    <select name="supervisor_id">
-                        <option value="">Nenhum</option>
-                        <?php foreach ($supervisores as $sup): ?>
-                            <option value="<?= $sup['id'] ?>"><?= htmlspecialchars($sup['nome']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="form-field">
+                        <label for="cargoCriar">Cargo</label>
+                        <select name="cargo" id="cargoCriar" onchange="toggleSupervisor('cargoCriar', 'divSupervisorCriar')">
+                            <option value="funcionario">Funcionário</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+
+                    <div id="divSupervisorCriar" class="form-field form-field-full">
+                        <label for="criarSupervisor">Supervisor</label>
+                        <select name="supervisor_id" id="criarSupervisor">
+                            <option value="">Nenhum</option>
+                            <?php foreach ($supervisores as $sup): ?>
+                                <option value="<?= (int) $sup['id'] ?>"><?= htmlspecialchars($sup['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="modal-actions">
@@ -332,38 +400,51 @@ $activePage = 'usuarios';
         </div>
     </div>
 
-    <!-- Modal Editar Usuário -->
     <div id="modalEditar" class="modal hidden">
-        <div class="modal-content">
-            <h3>Editar Usuário</h3>
+        <div class="modal-content user-modal-content">
+            <div class="user-modal-header">
+                <h3>Editar Usuário</h3>
+                <p>Atualize dados, permissões e vínculo hierárquico sem sair da listagem.</p>
+            </div>
+
             <form method="POST">
                 <input type="hidden" name="acao" value="editar">
                 <input type="hidden" name="id" id="editId">
-                
-                <label>Nome Completo</label>
-                <input type="text" name="nome" id="editNome" required>
 
-                <label>E-mail</label>
-                <input type="email" name="email" id="editEmail" required>
+                <div class="user-form-grid">
+                    <div class="form-field form-field-full">
+                        <label for="editNome">Nome Completo</label>
+                        <input type="text" name="nome" id="editNome" required>
+                    </div>
 
-                <label>Nova Senha <small style="color: #666; font-weight: normal;">(deixe em branco para manter a atual)</small></label>
-                <input type="password" name="nova_senha" id="editSenha" minlength="6" placeholder="Mínimo 6 caracteres">
+                    <div class="form-field form-field-full">
+                        <label for="editEmail">E-mail</label>
+                        <input type="email" name="email" id="editEmail" required>
+                    </div>
 
-                <label>Cargo</label>
-                <select name="cargo" id="editCargo" onchange="toggleSupervisor('editCargo', 'divSupervisorEdit')">
-                    <option value="funcionario">Funcionário</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="administrador">Administrador</option>
-                </select>
+                    <div class="form-field form-field-full">
+                        <label for="editSenha">Nova Senha <small class="field-hint">(deixe em branco para manter a atual)</small></label>
+                        <input type="password" name="nova_senha" id="editSenha" minlength="6" placeholder="Mínimo 6 caracteres">
+                    </div>
 
-                <div id="divSupervisorEdit">
-                    <label>Supervisor</label>
-                    <select name="supervisor_id" id="editSupervisor">
-                        <option value="">Nenhum</option>
-                        <?php foreach ($supervisores as $sup): ?>
-                            <option value="<?= $sup['id'] ?>"><?= htmlspecialchars($sup['nome']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="form-field">
+                        <label for="editCargo">Cargo</label>
+                        <select name="cargo" id="editCargo" onchange="toggleSupervisor('editCargo', 'divSupervisorEdit')">
+                            <option value="funcionario">Funcionário</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+
+                    <div id="divSupervisorEdit" class="form-field">
+                        <label for="editSupervisor">Supervisor</label>
+                        <select name="supervisor_id" id="editSupervisor">
+                            <option value="">Nenhum</option>
+                            <?php foreach ($supervisores as $sup): ?>
+                                <option value="<?= (int) $sup['id'] ?>"><?= htmlspecialchars($sup['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="modal-actions">
@@ -387,30 +468,28 @@ $activePage = 'usuarios';
             if (event.target.classList.contains('modal')) {
                 event.target.classList.add('hidden');
             }
-        }
+        };
 
         function toggleSupervisor(cargoId, divId) {
             const cargo = document.getElementById(cargoId).value;
             const divSupervisor = document.getElementById(divId);
-            divSupervisor.style.display = (cargo === 'funcionario') ? 'block' : 'none';
+            divSupervisor.style.display = cargo === 'funcionario' ? 'block' : 'none';
         }
 
-        function abrirEditar(id, nome, email, cargo, supervisorId) {
-            document.getElementById('editId').value = id;
-            document.getElementById('editNome').value = nome;
-            document.getElementById('editEmail').value = email;
+        function abrirEditar(button) {
+            document.getElementById('editId').value = button.dataset.userId || '';
+            document.getElementById('editNome').value = button.dataset.userNome || '';
+            document.getElementById('editEmail').value = button.dataset.userEmail || '';
             document.getElementById('editSenha').value = '';
-            document.getElementById('editCargo').value = cargo;
-            
-            if (supervisorId) {
-                document.getElementById('editSupervisor').value = supervisorId;
-            } else {
-                document.getElementById('editSupervisor').value = '';
-            }
-            
+            document.getElementById('editCargo').value = button.dataset.userCargo || 'funcionario';
+            document.getElementById('editSupervisor').value = button.dataset.userSupervisor || '';
+
             toggleSupervisor('editCargo', 'divSupervisorEdit');
             abrirModal('modalEditar');
         }
+
+        toggleSupervisor('cargoCriar', 'divSupervisorCriar');
+        toggleSupervisor('editCargo', 'divSupervisorEdit');
     </script>
     <script src="assets/js/main.js"></script>
 </body>

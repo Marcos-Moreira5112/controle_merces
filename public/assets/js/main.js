@@ -511,5 +511,130 @@ document.addEventListener('click', (event) => {
 });
 
 window.addEventListener('popstate', () => {
-    carregarPagina(window.location.href, { pushState: false });
+    if (document.querySelector('.tarefas-container')) {
+        carregarPagina(window.location.href, { pushState: false });
+    }
+    if (document.querySelector('.dashboard-container')) {
+        carregarDashboard(window.location.href, { pushState: false, preserveScroll: true });
+    }
+});
+
+// Dashboard interativo
+function getDashboardContainer() {
+    return document.querySelector('.dashboard-container');
+}
+
+async function carregarDashboard(url, { pushState = true, preserveScroll = true } = {}) {
+    const containerAtual = getDashboardContainer();
+    if (!containerAtual) {
+        window.location.href = url;
+        return;
+    }
+
+    const currentScrollY = window.scrollY;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Falha ao carregar o dashboard');
+        }
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const novoContainer = doc.querySelector('.dashboard-container');
+
+        if (!novoContainer) {
+            throw new Error('Dashboard não encontrado');
+        }
+
+        containerAtual.innerHTML = novoContainer.innerHTML;
+        document.title = doc.title || document.title;
+
+        const targetUrl = new URL(url, window.location.href).href;
+        if (pushState && window.location.href !== targetUrl) {
+            window.history.pushState({}, '', url);
+        }
+
+        inicializarDashboardInterativo();
+
+        if (preserveScroll) {
+            window.scrollTo({ top: currentScrollY, behavior: 'auto' });
+        }
+    } catch (error) {
+        window.location.href = url;
+    }
+}
+
+function inicializarDashboardInterativo() {
+    const inputPeriodo = document.getElementById('dashboardPeriodo');
+    const dateRange = document.querySelector('.custom-range');
+
+    if (!inputPeriodo || !dateRange) return;
+
+    const isCustom = inputPeriodo.value === 'personalizado';
+
+    document.querySelectorAll('.period-chip').forEach((chip) => {
+        chip.classList.toggle('active', chip.dataset.periodo === inputPeriodo.value);
+    });
+
+    dateRange.classList.toggle('is-active', isCustom);
+
+    dateRange.querySelectorAll('input').forEach((input) => {
+        input.disabled = !isCustom;
+    });
+}
+
+document.addEventListener('click', (event) => {
+    const chip = event.target.closest('.period-chip');
+    if (!chip) return;
+
+    const form = document.getElementById('dashboardFilterForm');
+    const inputPeriodo = document.getElementById('dashboardPeriodo');
+    if (!form || !inputPeriodo) return;
+
+    event.preventDefault();
+    inputPeriodo.value = chip.dataset.periodo || 'semana';
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    carregarDashboard(`${window.location.pathname}?${params.toString()}`);
+});
+
+document.addEventListener('change', (event) => {
+    const autoSubmit = event.target.closest('[data-dashboard-autosubmit]');
+    if (!autoSubmit) return;
+
+    const form = autoSubmit.closest('form');
+    if (form) {
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        carregarDashboard(`${window.location.pathname}?${params.toString()}`);
+    }
+});
+
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('#dashboardFilterForm');
+    if (!form) return;
+
+    event.preventDefault();
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    carregarDashboard(`${window.location.pathname}?${params.toString()}`);
+});
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('.dashboard-ajax-link');
+    if (!link) return;
+
+    event.preventDefault();
+    carregarDashboard(link.href);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    inicializarDashboardInterativo();
 });
