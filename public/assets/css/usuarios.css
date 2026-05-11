@@ -9,6 +9,137 @@
     padding: 1.5rem 1rem;
 }
 
+.user-management-container .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.user-management-container .page-header h2 {
+    color: var(--azul-marinho);
+    font-size: clamp(1.35rem, 2.5vw, 1.875rem);
+    line-height: 1.2;
+}
+
+.user-management-container .page-header p {
+    max-width: 760px;
+    color: var(--cinza-secundario);
+}
+
+.user-management-container .controls-bar {
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+
+.user-management-container .controls-bar .flex-1 {
+    min-width: min(100%, 280px);
+}
+
+.user-management-container .btn-add {
+    min-height: 42px;
+    justify-content: center;
+}
+
+.user-management-container .btn-add-secondary {
+    background: var(--azul-marinho);
+}
+
+.user-management-container .btn-add-secondary:hover {
+    background: #123d68;
+}
+
+.hierarchy-section {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    box-shadow: var(--sombra-leve);
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.section-heading h3 {
+    margin: 0;
+    color: var(--azul-marinho);
+    font-size: 1.15rem;
+}
+
+.section-kicker {
+    display: block;
+    color: var(--cinza-secundario);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.subteam-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.85rem;
+}
+
+.subteam-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid #dbe7f5;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.subteam-card.inactive {
+    opacity: 0.65;
+}
+
+.subteam-card h4 {
+    margin: 0 0 0.25rem;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.subteam-card p {
+    margin: 0;
+    color: var(--cinza-secundario);
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.subteam-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    color: #475569;
+    font-size: 0.85rem;
+}
+
+.subteam-edit {
+    align-self: flex-start;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    background: white;
+    color: var(--azul-marinho);
+    border: 1px solid #cbd5e1;
+    font-weight: 700;
+}
+
+.subteam-edit:hover {
+    background: #eef6ff;
+}
+
+.empty-state.compact {
+    padding: 1.5rem 1rem;
+}
+
 /* --- TABELA DE USUÁRIOS --- */
 .table-container {
     overflow-x: auto;
@@ -21,6 +152,7 @@
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
+    table-layout: auto;
 }
 
 .user-table thead th {
@@ -67,16 +199,19 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    min-width: 0;
 }
 
 .user-name {
     font-weight: 500;
     color: var(--cinza-texto);
+    overflow-wrap: anywhere;
 }
 
 .user-email {
     font-size: 0.85rem;
     color: var(--cinza-secundario);
+    overflow-wrap: anywhere;
 }
 
 /* --- AÇÕES --- */
@@ -125,4 +260,121 @@
 
 .user-table .action-btn:hover .icon-action {
     stroke: var(--azul-marinho);
+}
+
+/* --- MODAIS DE EQUIPE --- */
+.user-modal {
+    align-items: flex-start;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.user-modal-content {
+    width: min(100%, 520px);
+    max-height: calc(100vh - 2rem);
+    margin: auto 0;
+    overflow: hidden;
+    border-radius: 16px;
+}
+
+.user-modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.user-modal-header h3 {
+    margin: 0 0 0.35rem;
+    color: var(--azul-marinho);
+    font-size: 1.25rem;
+    line-height: 1.25;
+}
+
+.user-modal-header p {
+    margin: 0;
+    color: var(--cinza-secundario);
+    font-size: 0.92rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.user-modal-content form {
+    padding: 1.5rem;
+}
+
+.user-form-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.user-modal-content .form-field {
+    gap: 0.4rem;
+}
+
+.user-modal-content .form-field label {
+    margin-bottom: 0;
+}
+
+.user-modal-content input,
+.user-modal-content select {
+    min-height: 46px;
+    margin-bottom: 0;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    width: 100%;
+}
+
+.user-modal-content input:focus,
+.user-modal-content select:focus {
+    border-color: var(--laranja);
+    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.12);
+}
+
+.field-hint {
+    color: var(--cinza-secundario);
+    font-weight: 500;
+}
+
+.user-modal-content .modal-actions {
+    margin-top: 1.25rem;
+}
+
+@media (max-width: 640px) {
+    .user-management-container {
+        padding: 1rem 0.75rem;
+    }
+
+    .user-management-container .controls-bar {
+        gap: 0.75rem;
+    }
+
+    .user-management-container .controls-bar .flex-1,
+    .user-management-container .btn-add {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .user-modal {
+        padding: 0.75rem;
+    }
+
+    .user-modal-content {
+        max-height: calc(100vh - 1.5rem);
+        border-radius: 12px;
+    }
+
+    .user-modal-header,
+    .user-modal-content form {
+        padding: 1rem;
+    }
+
+    .user-modal-content .modal-actions {
+        flex-direction: column-reverse;
+        gap: 0.6rem;
+    }
+
+    .user-modal-content .modal-actions button {
+        width: 100%;
+    }
 }

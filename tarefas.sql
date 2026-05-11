@@ -103,6 +103,54 @@ ALTER TABLE `tarefas`
   ADD CONSTRAINT `tarefas_ibfk_1` FOREIGN KEY (`atribuida_para`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL;
 COMMIT;
 
+-- Ajuste para multi-equipe por conta titular
+ALTER TABLE `usuarios`
+  ADD COLUMN `equipe_nome` varchar(150) DEFAULT NULL AFTER `nome`,
+  ADD COLUMN `titular_id` int(11) DEFAULT NULL AFTER `supervisor_id`,
+  ADD KEY `idx_usuarios_titular_id` (`titular_id`);
+
+ALTER TABLE `tarefas`
+  ADD COLUMN `titular_id` int(11) DEFAULT NULL AFTER `atribuida_para`,
+  ADD KEY `idx_tarefas_titular_id` (`titular_id`);
+
+UPDATE `usuarios`
+SET `titular_id` = `id`
+WHERE `cargo` = 'administrador' AND (`titular_id` IS NULL OR `titular_id` = 0);
+
+UPDATE `usuarios`
+SET `equipe_nome` = `nome`
+WHERE `cargo` = 'administrador'
+  AND (`equipe_nome` IS NULL OR `equipe_nome` = '');
+
+UPDATE `usuarios`
+SET `titular_id` = `supervisor_id`
+WHERE `cargo` <> 'administrador'
+  AND `supervisor_id` IS NOT NULL
+  AND (`titular_id` IS NULL OR `titular_id` = 0);
+
+UPDATE `tarefas` t
+INNER JOIN `usuarios` u ON u.id = t.usuario_id
+SET t.`titular_id` = COALESCE(u.`titular_id`, u.`supervisor_id`, u.`id`)
+WHERE t.`titular_id` IS NULL;
+
+-- Estrutura de sub-equipes e lideranças internas
+CREATE TABLE IF NOT EXISTS `sub_equipes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `titular_id` int(11) NOT NULL,
+  `nome` varchar(150) NOT NULL,
+  `descricao` varchar(255) DEFAULT NULL,
+  `lider_id` int(11) DEFAULT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_sub_equipes_titular_id` (`titular_id`),
+  KEY `idx_sub_equipes_lider_id` (`lider_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `usuarios`
+  ADD COLUMN `sub_equipe_id` int(11) DEFAULT NULL AFTER `titular_id`,
+  ADD COLUMN `funcao_equipe` varchar(120) DEFAULT NULL AFTER `sub_equipe_id`;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

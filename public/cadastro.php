@@ -14,46 +14,62 @@ if (isset($_SESSION['usuario_id'])) {
 }
 
 $erro = '';
-$sucesso = '';
-$totalUsuarios = (int) $pdo->query("SELECT COUNT(*) FROM usuarios")->fetchColumn();
-$cargoInicial = $totalUsuarios === 0 ? 'administrador' : 'funcionario';
-$tituloOnboarding = $cargoInicial === 'administrador' ? 'Crie a primeira conta do sistema' : 'Criar nova conta';
-$subtituloOnboarding = $cargoInicial === 'administrador'
-    ? 'A primeira conta criada já entra com acesso de administrador.'
-    : 'Novas contas públicas entram como funcionário e podem ser ajustadas depois por um administrador.';
+$valores = [
+    'nome' => '',
+    'equipe_nome' => '',
+    'email' => '',
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nome = trim($_POST['nome'] ?? '');
+    $equipeNome = trim($_POST['equipe_nome'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
     $confirmarSenha = $_POST['confirmar_senha'] ?? '';
 
-    if ($nome === '' || $email === '' || $senha === '' || $confirmarSenha === '') {
-        $erro = 'Preencha todos os campos para criar a conta.';
+    $valores = [
+        'nome' => $nome,
+        'equipe_nome' => $equipeNome,
+        'email' => $email,
+    ];
+
+    if ($nome === '' || $equipeNome === '' || $email === '' || $senha === '' || $confirmarSenha === '') {
+        $erro = 'Preencha todos os campos para criar sua conta.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $erro = 'Informe um e-mail válido.';
     } elseif (strlen($senha) < 6) {
         $erro = 'A senha deve ter pelo menos 6 caracteres.';
     } elseif ($senha !== $confirmarSenha) {
-        $erro = 'A confirmação da senha não confere.';
+        $erro = 'As senhas não conferem.';
     } else {
-        $stmtEmail = $pdo->prepare("SELECT id FROM usuarios WHERE email = ? LIMIT 1");
-        $stmtEmail->execute([$email]);
-        $emailExistente = $stmtEmail->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmtExiste = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = :email");
+            $stmtExiste->execute([':email' => $email]);
 
-        if ($emailExistente) {
-            $erro = 'Esse e-mail já está cadastrado.';
-        } else {
-            $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-            $stmtInsert = $pdo->prepare(
-                "INSERT INTO usuarios (nome, email, senha, cargo, supervisor_id, ativo)
-                 VALUES (?, ?, ?, ?, NULL, 1)"
-            );
-            $stmtInsert->execute([$nome, $email, $senhaHash, $cargoInicial]);
+            if ((int) $stmtExiste->fetchColumn() > 0) {
+                $erro = 'Já existe uma conta usando este e-mail.';
+            } else {
+                $stmtCriar = $pdo->prepare(
+                    "INSERT INTO usuarios (nome, equipe_nome, email, senha, cargo, supervisor_id, titular_id, ativo)
+                     VALUES (:nome, :equipe_nome, :email, :senha, 'administrador', NULL, NULL, 1)"
+                );
+                $stmtCriar->execute([
+                    ':nome' => $nome,
+                    ':equipe_nome' => $equipeNome,
+                    ':email' => $email,
+                    ':senha' => password_hash($senha, PASSWORD_DEFAULT),
+                ]);
 
-            $_SESSION['usuario_id'] = (int) $pdo->lastInsertId();
-            header('Location: dashboard.php');
-            exit;
+                $novoUsuarioId = (int) $pdo->lastInsertId();
+                $stmtTitular = $pdo->prepare("UPDATE usuarios SET titular_id = :id WHERE id = :id");
+                $stmtTitular->execute([':id' => $novoUsuarioId]);
+
+                $_SESSION['mensagem_login'] = 'Conta criada com sucesso. Entre para acessar sua equipe.';
+                header('Location: login.php');
+                exit;
+            }
+        } catch (PDOException $e) {
+            $erro = 'Não foi possível criar a conta agora. Confira os dados e tente novamente.';
         }
     }
 }
@@ -62,13 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Criar Conta | Óticas Mercês</title>
+    <title>Criar conta | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="login-page">
-
+<body class="login-page signup-page">
     <div class="login-wrapper auth-wrapper">
         <div class="login-brand">
             <div class="brand-content">
@@ -86,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <path d="M9 14l2 2 4-4"/>
                             </svg>
                         </div>
-                        <span>Centralize tarefas, prazos e prioridades</span>
+                        <span>Crie a conta titular da sua equipe</span>
                     </div>
                     <div class="brand-feature">
                         <div class="brand-feature-icon">
@@ -96,16 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
                             </svg>
                         </div>
-                        <span>Organize usuários e responsabilidades</span>
-                    </div>
-                    <div class="brand-feature">
-                        <div class="brand-feature-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 20h9"/>
-                                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/>
-                            </svg>
-                        </div>
-                        <span>Comece com uma conta e personalize depois</span>
+                        <span>Depois convide outros membros para essa equipe</span>
                     </div>
                 </div>
             </div>
@@ -113,8 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="login-form-container">
             <div class="login-header">
-                <h2><?= htmlspecialchars($tituloOnboarding) ?></h2>
-                <p><?= htmlspecialchars($subtituloOnboarding) ?></p>
+                <h2>Criar conta titular</h2>
+                <p>Informe os dados iniciais para acessar o TaskBlue.</p>
             </div>
 
             <?php if ($erro): ?>
@@ -128,70 +134,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <?php if ($sucesso): ?>
-                <div class="login-success"><?= htmlspecialchars($sucesso) ?></div>
-            <?php endif; ?>
-
             <form method="POST" class="login-form">
                 <div class="form-field">
-                    <label for="nome">Nome</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="nome" name="nome" placeholder="Seu nome" required autocomplete="name">
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
+                    <label for="nome">Nome do titular</label>
+                    <div class="input-wrapper no-icon">
+                        <input type="text" id="nome" name="nome" value="<?= htmlspecialchars($valores['nome']) ?>" placeholder="Seu nome" required autocomplete="name">
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <label for="equipe_nome">Nome da equipe</label>
+                    <div class="input-wrapper no-icon">
+                        <input type="text" id="equipe_nome" name="equipe_nome" value="<?= htmlspecialchars($valores['equipe_nome']) ?>" placeholder="Ex: Grupo de estudos, Projeto X..." required>
                     </div>
                 </div>
 
                 <div class="form-field">
                     <label for="email">E-mail</label>
-                    <div class="input-wrapper">
-                        <input type="email" id="email" name="email" placeholder="seu@email.com" required autocomplete="email">
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                            <polyline points="22,6 12,13 2,6"/>
-                        </svg>
+                    <div class="input-wrapper no-icon">
+                        <input type="email" id="email" name="email" value="<?= htmlspecialchars($valores['email']) ?>" placeholder="seu@email.com" required autocomplete="email">
                     </div>
                 </div>
 
                 <div class="form-field">
                     <label for="senha">Senha</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="senha" name="senha" placeholder="••••••••" required minlength="6" autocomplete="new-password">
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
+                    <div class="input-wrapper no-icon">
+                        <input type="password" id="senha" name="senha" placeholder="Mínimo de 6 caracteres" required autocomplete="new-password">
                     </div>
                 </div>
 
                 <div class="form-field">
                     <label for="confirmar_senha">Confirmar senha</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="confirmar_senha" name="confirmar_senha" placeholder="••••••••" required minlength="6" autocomplete="new-password">
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4"/>
-                            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9Z"/>
-                        </svg>
+                    <div class="input-wrapper no-icon">
+                        <input type="password" id="confirmar_senha" name="confirmar_senha" placeholder="Digite a senha novamente" required autocomplete="new-password">
                     </div>
                 </div>
 
                 <button type="submit" class="btn-login">
                     Criar conta
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                        <polyline points="12 5 19 12 12 19"/>
-                    </svg>
                 </button>
             </form>
 
             <div class="auth-switch">
-                <p>Já tem conta?</p>
-                <a href="login.php">Entrar agora</a>
+                <p>Já tem uma conta?</p>
+                <a href="login.php">Entrar</a>
             </div>
         </div>
     </div>
-
 </body>
 </html>

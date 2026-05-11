@@ -25,17 +25,27 @@ $usuario_id = $_SESSION['usuario_id'];
 $usuarioLogado = buscarUsuarioLogadoParaTarefas($pdo, $usuario_id);
 $cargoUsuario = $usuarioLogado['cargo'];
 $nomeUsuario = $usuarioLogado['nome'];
+$nomeEquipe = obterNomeEquipe($usuarioLogado);
 $dicaAtual = getDicaAleatoriaTarefas();
 
 $filtros = obterFiltrosTarefas();
 $filtro_busca = $filtros['busca'];
 $filtro_status = $filtros['status'];
 $filtro_tipo = $filtros['tipo'];
+$filtro_sub_equipe = $filtros['sub_equipe'];
 $filtro_usuario = $filtros['usuario'];
 $ordenar_por = $filtros['ordenar'];
 
 $usuariosDisponiveis = buscarUsuariosDisponiveisParaAtribuicao($pdo, $cargoUsuario, $usuario_id);
 $usuariosFiltro = buscarUsuariosFiltroTarefas($pdo, $cargoUsuario, $usuario_id);
+$idsSubEquipesVisiveis = array_values(array_unique(array_filter(
+    array_map(static fn (array $user): int => (int) ($user['sub_equipe_id'] ?? 0), $usuariosFiltro)
+)));
+$subEquipesFiltro = array_values(array_filter(
+    buscarSubEquipesDaConta($pdo, obterTitularIdUsuario($usuarioLogado), true),
+    static fn (array $subEquipe): bool => in_array((int) $subEquipe['id'], $idsSubEquipesVisiveis, true)
+));
+$podeVerDetalhesEquipe = count($usuariosFiltro) > 1;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $titulo = trim($_POST['titulo']);
@@ -57,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'tipo' => $tipo,
             'usuario_id' => $usuario_id,
             'atribuida_para' => $atribuida_para,
+            'titular_id' => (int) ($usuarioLogado['titular_id'] ?? $usuario_id),
         ]);
 
         $_SESSION['mensagem'] = 'Tarefa adicionada com sucesso!';
@@ -73,8 +84,7 @@ if (isset($_GET['acao'], $_GET['id']) && $_GET['acao'] === 'toggle') {
     $tarefa_id = (int) $_GET['id'];
     $tarefaCheck = buscarPermissaoTarefa($pdo, $tarefa_id);
 
-    $podeAlterar = $cargoUsuario === 'administrador'
-        || ($tarefaCheck && ($tarefaCheck['usuario_id'] == $usuario_id || $tarefaCheck['atribuida_para'] == $usuario_id));
+    $podeAlterar = $tarefaCheck && usuarioPodeAcessarTarefa($pdo, $usuarioLogado, $tarefaCheck);
 
     if ($podeAlterar) {
         alternarStatusTarefa($pdo, $tarefa_id);
@@ -107,7 +117,7 @@ $activePage = 'tarefas';
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Tarefas | Óticas Mercês</title>
+    <title>Tarefas | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -421,7 +431,7 @@ $activePage = 'tarefas';
                                                     <?= htmlspecialchars(date('d/m/Y', strtotime($tarefa['prazo']))) ?>
                                                 </span>
                                                 
-                                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                <?php if ($podeVerDetalhesEquipe): ?>
                                                     <!-- Criador da tarefa -->
                                                     <span class="task-creator">
                                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -564,7 +574,7 @@ $activePage = 'tarefas';
                                                     <?= htmlspecialchars(date('d/m/Y', strtotime($tarefa['prazo']))) ?>
                                                 </span>
                                                 
-                                                <?php if ($cargoUsuario !== 'funcionario'): ?>
+                                                <?php if ($podeVerDetalhesEquipe): ?>
                                                     <span class="task-creator">
                                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>

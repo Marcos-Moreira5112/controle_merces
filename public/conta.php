@@ -8,33 +8,26 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
+require_once __DIR__ . '/includes/auth_helpers.php';
 
 $usuarioId = (int) $_SESSION['usuario_id'];
 $mensagem = '';
 $tipoMensagem = '';
 
-function buscarUsuarioConta(PDO $pdo, int $usuarioId): array|false
-{
-    $sql = "SELECT u.id, u.nome, u.email, u.cargo, u.supervisor_id, u.ativo, u.created_at, s.nome AS supervisor_nome
-            FROM usuarios u
-            LEFT JOIN usuarios s ON s.id = u.supervisor_id
-            WHERE u.id = ?
-            LIMIT 1";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$usuarioId]);
-
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
     if ($acao === 'atualizar_perfil') {
+        $usuarioAtual = buscarUsuarioAutenticado($pdo, $usuarioId);
         $nome = trim($_POST['nome'] ?? '');
         $email = trim($_POST['email'] ?? '');
+        $equipeNome = trim($_POST['equipe_nome'] ?? '');
 
         if ($nome === '' || $email === '') {
             $mensagem = 'Nome e e-mail são obrigatórios.';
+            $tipoMensagem = 'erro';
+        } elseif (usuarioEhTitular($usuarioAtual ?: []) && $equipeNome === '') {
+            $mensagem = 'O nome da equipe é obrigatório para a conta titular.';
             $tipoMensagem = 'erro';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $mensagem = 'Informe um e-mail válido.';
@@ -42,14 +35,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $stmtEmail = $pdo->prepare("SELECT id FROM usuarios WHERE email = ? AND id <> ? LIMIT 1");
             $stmtEmail->execute([$email, $usuarioId]);
-            $emailExistente = $stmtEmail->fetch(PDO::FETCH_ASSOC);
 
-            if ($emailExistente) {
+            if ($stmtEmail->fetch(PDO::FETCH_ASSOC)) {
                 $mensagem = 'Esse e-mail já está em uso por outra conta.';
                 $tipoMensagem = 'erro';
             } else {
-                $stmtUpdate = $pdo->prepare("UPDATE usuarios SET nome = ?, email = ? WHERE id = ?");
-                $stmtUpdate->execute([$nome, $email, $usuarioId]);
+                if (usuarioEhTitular($usuarioAtual ?: [])) {
+                    $stmtUpdate = $pdo->prepare("UPDATE usuarios SET nome = ?, email = ?, equipe_nome = ? WHERE id = ?");
+                    $stmtUpdate->execute([$nome, $email, $equipeNome, $usuarioId]);
+                } else {
+                    $stmtUpdate = $pdo->prepare("UPDATE usuarios SET nome = ?, email = ? WHERE id = ?");
+                    $stmtUpdate->execute([$nome, $email, $usuarioId]);
+                }
+
                 $mensagem = 'Seus dados foram atualizados com sucesso.';
                 $tipoMensagem = 'sucesso';
             }
@@ -78,17 +76,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mensagem = 'A confirmação da senha não confere.';
             $tipoMensagem = 'erro';
         } else {
-            $novaSenhaHash = password_hash($novaSenha, PASSWORD_DEFAULT);
             $stmtSenhaUpdate = $pdo->prepare("UPDATE usuarios SET senha = ? WHERE id = ?");
-            $stmtSenhaUpdate->execute([$novaSenhaHash, $usuarioId]);
+            $stmtSenhaUpdate->execute([password_hash($novaSenha, PASSWORD_DEFAULT), $usuarioId]);
             $mensagem = 'Sua senha foi alterada com sucesso.';
             $tipoMensagem = 'sucesso';
         }
     }
 }
 
-$usuario = buscarUsuarioConta($pdo, $usuarioId);
-
+$usuario = buscarUsuarioAutenticado($pdo, $usuarioId);
 if (!$usuario) {
     session_destroy();
     header('Location: login.php');
@@ -101,13 +97,14 @@ $pageTitle = 'Minha Conta';
 $activePage = 'conta';
 $dataCriacao = !empty($usuario['created_at']) ? date('d/m/Y', strtotime($usuario['created_at'])) : 'Não informado';
 $statusConta = (int) ($usuario['ativo'] ?? 1) === 1 ? 'Ativa' : 'Inativa';
-$supervisorNome = $usuario['supervisor_nome'] ?: 'Não vinculado';
+$nomeEquipe = obterNomeEquipe($usuario);
+$vinculoConta = usuarioEhTitular($usuario) ? 'Conta titular' : $nomeEquipe;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Minha Conta | Óticas Mercês</title>
+    <title>Minha Conta | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -120,7 +117,7 @@ $supervisorNome = $usuario['supervisor_nome'] ?: 'Não vinculado';
             <div>
                 <span class="account-eyebrow">Conta</span>
                 <h1>Gerencie seus dados</h1>
-                <p>Atualize suas informações de acesso e acompanhe os detalhes da sua conta.</p>
+                <p>Atualize as informações da sua conta e, se você for titular, o nome exibido para a equipe no TaskBlue.</p>
             </div>
         </section>
 
@@ -133,7 +130,6 @@ $supervisorNome = $usuario['supervisor_nome'] ?: 'Não vinculado';
         <div class="account-grid">
             <section class="account-panel account-summary">
                 <h2>Resumo da conta</h2>
-
                 <div class="account-summary-list">
                     <div class="account-summary-item">
                         <span>Nome</span>
@@ -144,16 +140,20 @@ $supervisorNome = $usuario['supervisor_nome'] ?: 'Não vinculado';
                         <strong><?= htmlspecialchars($usuario['email']) ?></strong>
                     </div>
                     <div class="account-summary-item">
-                        <span>Cargo</span>
-                        <strong><?= ucfirst(htmlspecialchars($usuario['cargo'])) ?></strong>
+                        <span>Tipo de acesso</span>
+                        <strong><?= htmlspecialchars(montarRotuloCargo($usuario['cargo'])) ?></strong>
+                    </div>
+                    <div class="account-summary-item">
+                        <span>Equipe</span>
+                        <strong><?= htmlspecialchars($nomeEquipe) ?></strong>
                     </div>
                     <div class="account-summary-item">
                         <span>Status</span>
                         <strong><?= htmlspecialchars($statusConta) ?></strong>
                     </div>
                     <div class="account-summary-item">
-                        <span>Supervisor</span>
-                        <strong><?= htmlspecialchars($supervisorNome) ?></strong>
+                        <span>Vínculo</span>
+                        <strong><?= htmlspecialchars($vinculoConta) ?></strong>
                     </div>
                     <div class="account-summary-item">
                         <span>Conta criada em</span>
@@ -164,45 +164,42 @@ $supervisorNome = $usuario['supervisor_nome'] ?: 'Não vinculado';
 
             <section class="account-panel">
                 <h2>Dados pessoais</h2>
-
                 <form method="POST" class="account-form">
                     <input type="hidden" name="acao" value="atualizar_perfil">
-
                     <label class="account-field">
                         <span>Nome</span>
                         <input type="text" name="nome" value="<?= htmlspecialchars($usuario['nome']) ?>" required>
                     </label>
-
+                    <?php if (usuarioEhTitular($usuario)): ?>
+                        <label class="account-field">
+                            <span>Nome da equipe</span>
+                            <input type="text" name="equipe_nome" value="<?= htmlspecialchars($usuario['equipe_nome'] ?? '') ?>" required>
+                        </label>
+                    <?php endif; ?>
                     <label class="account-field">
                         <span>E-mail</span>
                         <input type="email" name="email" value="<?= htmlspecialchars($usuario['email']) ?>" required>
                     </label>
-
                     <button type="submit" class="account-btn">Salvar alterações</button>
                 </form>
             </section>
 
             <section class="account-panel">
                 <h2>Segurança</h2>
-
                 <form method="POST" class="account-form">
                     <input type="hidden" name="acao" value="atualizar_senha">
-
                     <label class="account-field">
                         <span>Senha atual</span>
                         <input type="password" name="senha_atual" required>
                     </label>
-
                     <label class="account-field">
                         <span>Nova senha</span>
                         <input type="password" name="nova_senha" minlength="6" required>
                     </label>
-
                     <label class="account-field">
                         <span>Confirmar nova senha</span>
                         <input type="password" name="confirmar_senha" minlength="6" required>
                     </label>
-
                     <button type="submit" class="account-btn">Atualizar senha</button>
                 </form>
             </section>

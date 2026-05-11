@@ -1,7 +1,7 @@
 <?php
 // usa as variáveis já criadas em tarefas.php:
-// $filtro_busca, $filtro_status, $filtro_tipo, $filtro_usuario, $ordenar_por
-// $usuariosFiltro, $filtrosAtivos, $totalFiltrado
+// $filtro_busca, $filtro_status, $filtro_tipo, $filtro_sub_equipe, $filtro_usuario, $ordenar_por
+// $usuariosFiltro, $subEquipesFiltro, $filtrosAtivos, $totalFiltrado
 ?>
 
 <div class="tarefas-filtros-card">
@@ -9,6 +9,7 @@
         <form method="GET" class="filtro-busca-form js-filtros-form">
             <input type="hidden" name="status" value="<?= htmlspecialchars($filtro_status) ?>">
             <input type="hidden" name="tipo" value="<?= htmlspecialchars($filtro_tipo) ?>">
+            <input type="hidden" name="sub_equipe" value="<?= htmlspecialchars($filtro_sub_equipe) ?>">
             <input type="hidden" name="usuario" value="<?= htmlspecialchars($filtro_usuario) ?>">
             <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenar_por) ?>">
 
@@ -100,16 +101,39 @@
         </div>
 
         <div class="filtros-bloco filtros-bloco-select">
+            <?php if (!empty($subEquipesFiltro)): ?>
+                <div class="filtro-select-group">
+                    <span class="filtros-label">Sub-equipe</span>
+                    <select class="filtro-select js-filtro-select">
+                        <option value="<?= buildFilterUrl(['sub_equipe' => 'todos', 'usuario' => 'todos']) ?>" <?= $filtro_sub_equipe === 'todos' ? 'selected' : '' ?>>
+                            Todas visíveis
+                        </option>
+                        <?php foreach ($subEquipesFiltro as $subEquipe): ?>
+                            <option value="<?= buildFilterUrl(['sub_equipe' => $subEquipe['id'], 'usuario' => 'todos']) ?>" <?= (string) $filtro_sub_equipe === (string) $subEquipe['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($subEquipe['nome']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            <?php endif; ?>
+
             <?php if (!empty($usuariosFiltro)): ?>
                 <div class="filtro-select-group">
-                    <span class="filtros-label">Usuário</span>
+                    <span class="filtros-label">Membro</span>
                     <select class="filtro-select js-filtro-select">
                         <option value="<?= buildFilterUrl(['usuario' => 'todos']) ?>" <?= $filtro_usuario === 'todos' ? 'selected' : '' ?>>
-                            Todos
+                            Todos visíveis
                         </option>
                         <?php foreach ($usuariosFiltro as $u): ?>
                             <option value="<?= buildFilterUrl(['usuario' => $u['id']]) ?>" <?= $filtro_usuario == $u['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($u['nome']) ?> (<?= ucfirst($u['cargo']) ?>)
+                                <?= htmlspecialchars($u['nome']) ?>
+                                <?php if (!empty($u['funcao_equipe'])): ?>
+                                    - <?= htmlspecialchars($u['funcao_equipe']) ?>
+                                <?php elseif (!empty($u['sub_equipe_nome'])): ?>
+                                    - <?= htmlspecialchars($u['sub_equipe_nome']) ?>
+                                <?php else: ?>
+                                    - <?= htmlspecialchars(montarRotuloPapelEquipe($u)) ?>
+                                <?php endif; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -158,6 +182,20 @@
                     }
                 }
                 ?>
+                <?php
+                $nomeSubEquipeFiltro = '';
+                if ($filtro_sub_equipe !== 'todos') {
+                    foreach ($subEquipesFiltro as $subEquipe) {
+                        if ((string) $subEquipe['id'] === (string) $filtro_sub_equipe) {
+                            $nomeSubEquipeFiltro = $subEquipe['nome'];
+                            break;
+                        }
+                    }
+                }
+                ?>
+                <?php if ($nomeSubEquipeFiltro !== ''): ?>
+                    em <strong><?= htmlspecialchars($nomeSubEquipeFiltro) ?></strong>
+                <?php endif; ?>
                 <?php if ($nomeUsuarioFiltro !== ''): ?>
                     de <strong><?= htmlspecialchars($nomeUsuarioFiltro) ?></strong>
                 <?php endif; ?>

@@ -13,6 +13,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once __DIR__ . '/../../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
+require_once __DIR__ . '/../includes/auth_helpers.php';
 
 $usuarioId = (int) $_SESSION['usuario_id'];
 $tarefaId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
@@ -25,12 +26,8 @@ if ($tarefaId <= 0) {
     exit;
 }
 
-// Buscar cargo do usuário logado
-$stmtUsuario = $pdo->prepare("SELECT cargo FROM usuarios WHERE id = :id");
-$stmtUsuario->execute([':id' => $usuarioId]);
-$usuarioLogado = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
-
-if (!$usuarioLogado) {
+$usuario = buscarUsuarioAutenticado($pdo, $usuarioId);
+if (!$usuario) {
     echo json_encode([
         'success' => false,
         'message' => 'Usuário inválido.'
@@ -38,11 +35,8 @@ if (!$usuarioLogado) {
     exit;
 }
 
-$cargoUsuario = $usuarioLogado['cargo'];
-
-// Buscar tarefa
 $stmtTarefa = $pdo->prepare("
-    SELECT id, usuario_id, atribuida_para, status, prazo
+    SELECT id, usuario_id, atribuida_para, titular_id, status, prazo
     FROM tarefas
     WHERE id = :id AND arquivada = 0
     LIMIT 1
@@ -58,19 +52,7 @@ if (!$tarefa) {
     exit;
 }
 
-// Permissão
-$podeAlterar = false;
-
-if ($cargoUsuario === 'administrador') {
-    $podeAlterar = true;
-} elseif (
-    (int) $tarefa['usuario_id'] === $usuarioId ||
-    (!empty($tarefa['atribuida_para']) && (int) $tarefa['atribuida_para'] === $usuarioId)
-) {
-    $podeAlterar = true;
-}
-
-if (!$podeAlterar) {
+if (!usuarioPodeAcessarTarefa($pdo, $usuario, $tarefa)) {
     echo json_encode([
         'success' => false,
         'message' => 'Sem permissão para alterar esta tarefa.'
@@ -78,7 +60,6 @@ if (!$podeAlterar) {
     exit;
 }
 
-// Toggle
 $novoStatus = ($tarefa['status'] === 'concluida') ? 'pendente' : 'concluida';
 
 $stmtUpdate = $pdo->prepare("
@@ -91,7 +72,6 @@ $stmtUpdate->execute([
     ':id' => $tarefaId
 ]);
 
-// status visual para a interface
 $hoje = new DateTime('today');
 $prazo = new DateTime($tarefa['prazo']);
 

@@ -6,6 +6,7 @@ function obterFiltrosTarefas(): array
         'busca' => trim($_GET['busca'] ?? ''),
         'status' => $_GET['status'] ?? 'todos',
         'tipo' => $_GET['tipo'] ?? 'todos',
+        'sub_equipe' => $_GET['sub_equipe'] ?? 'todos',
         'usuario' => $_GET['usuario'] ?? 'todos',
         'ordenar' => $_GET['ordenar'] ?? 'vencimento_asc',
     ];
@@ -54,6 +55,7 @@ function montarQueryStringFiltros(array $filtros): string
         'busca' => $filtros['busca'],
         'status' => $filtros['status'],
         'tipo' => $filtros['tipo'],
+        'sub_equipe' => $filtros['sub_equipe'],
         'usuario' => $filtros['usuario'],
         'ordenar' => $filtros['ordenar'],
     ]);

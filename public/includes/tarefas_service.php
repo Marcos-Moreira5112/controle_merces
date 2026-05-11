@@ -60,5 +60,6 @@ function filtrosDeTarefasEstaoAtivos(array $filtros): bool
     return $filtros['busca'] !== ''
         || $filtros['status'] !== 'todos'
         || $filtros['tipo'] !== 'todos'
+        || $filtros['sub_equipe'] !== 'todos'
         || $filtros['usuario'] !== 'todos';
 }

@@ -14,16 +14,16 @@ if (isset($_SESSION['usuario_id'])) {
 }
 
 $erro = '';
+$mensagemSucesso = $_SESSION['mensagem_login'] ?? '';
+unset($_SESSION['mensagem_login']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $senha = trim($_POST['senha'] ?? '');
 
-    $sql = "SELECT id, senha, ativo FROM usuarios WHERE email = :email LIMIT 1";
-    $stmt = $pdo->prepare($sql);
+    $stmt = $pdo->prepare("SELECT id, senha, ativo FROM usuarios WHERE email = :email LIMIT 1");
     $stmt->bindParam(':email', $email);
     $stmt->execute();
-
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($usuario && (int) ($usuario['ativo'] ?? 1) === 1 && password_verify($senha, $usuario['senha'])) {
@@ -39,13 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Login | Óticas Mercês</title>
+    <title>Login | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="login-page">
-
     <div class="login-wrapper auth-wrapper">
         <div class="login-brand">
             <div class="brand-content">
@@ -63,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <path d="M9 14l2 2 4-4"/>
                             </svg>
                         </div>
-                        <span>Gerencie tarefas da equipe</span>
+                        <span>Gerencie tarefas da sua equipe</span>
                     </div>
                     <div class="brand-feature">
                         <div class="brand-feature-icon">
@@ -73,17 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
                             </svg>
                         </div>
-                        <span>Controle de usuários</span>
-                    </div>
-                    <div class="brand-feature">
-                        <div class="brand-feature-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <polyline points="1 20 1 14 7 14"/>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                            </svg>
-                        </div>
-                        <span>Tarefas recorrentes automáticas</span>
+                        <span>Membros entram com login próprio dentro da equipe</span>
                     </div>
                 </div>
             </div>
@@ -92,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="login-form-container">
             <div class="login-header">
                 <h2>Bem-vindo de volta!</h2>
-                <p>Entre com suas credenciais para acessar sua conta.</p>
+                <p>Entre com suas credenciais para acessar sua equipe.</p>
             </div>
 
             <?php if ($erro): ?>
@@ -106,63 +95,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
+            <?php if ($mensagemSucesso): ?>
+                <div class="login-success">
+                    <?= htmlspecialchars($mensagemSucesso) ?>
+                </div>
+            <?php endif; ?>
+
             <form method="POST" class="login-form">
                 <div class="form-field">
                     <label for="email">E-mail</label>
                     <div class="input-wrapper">
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            placeholder="seu@email.com"
-                            required
-                            autocomplete="email"
-                        >
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                            <polyline points="22,6 12,13 2,6"/>
-                        </svg>
+                        <input type="email" id="email" name="email" placeholder="seu@email.com" required autocomplete="email">
                     </div>
                 </div>
 
                 <div class="form-field">
                     <label for="senha">Senha</label>
                     <div class="input-wrapper">
-                        <input
-                            type="password"
-                            id="senha"
-                            name="senha"
-                            placeholder="••••••••"
-                            required
-                            autocomplete="current-password"
-                        >
-                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
+                        <input type="password" id="senha" name="senha" placeholder="••••••••" required autocomplete="current-password">
                     </div>
                 </div>
 
                 <button type="submit" class="btn-login">
                     Entrar no sistema
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                        <polyline points="12 5 19 12 12 19"/>
-                    </svg>
                 </button>
             </form>
 
             <div class="auth-switch">
-                <p>Ainda não tem conta?</p>
+                <p>Vai criar a conta titular?</p>
                 <a href="cadastro.php">Criar conta</a>
             </div>
-
-            <div class="login-footer">
-                <p>© <?= date('Y') ?> Óticas Mercês • Todos os direitos reservados</p>
-            </div>
         </div>
-
     </div>
-
 </body>
 </html>

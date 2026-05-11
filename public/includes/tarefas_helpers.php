@@ -46,7 +46,7 @@ function getDicasTarefas(): array
         [
             'icone' => '👥',
             'titulo' => 'Atribuir tarefas',
-            'texto' => 'Supervisores podem <strong>atribuir tarefas</strong> para seus funcionários no formulário de criação.'
+            'texto' => 'Titulares podem <strong>atribuir tarefas</strong> para membros da equipe no formulário de criação.'
         ],
         [
             'icone' => '📊',

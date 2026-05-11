@@ -8,6 +8,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once __DIR__ . '/../config.php';
 require_once ROOT_PATH . '/config/conexao.php';
+require_once __DIR__ . '/includes/auth_helpers.php';
 
 $usuarioId = (int) $_SESSION['usuario_id'];
 
@@ -90,7 +91,7 @@ function montarQueryString(array $params): string
     return http_build_query(array_filter($params, static fn ($value) => $value !== null && $value !== ''));
 }
 
-$usuario = fetchOneAssoc($pdo, "SELECT id, nome, cargo FROM usuarios WHERE id = ?", [$usuarioId]);
+$usuario = buscarUsuarioAutenticado($pdo, $usuarioId);
 
 if (!$usuario) {
     session_destroy();
@@ -100,6 +101,8 @@ if (!$usuario) {
 
 $nomeUsuario = $usuario['nome'];
 $cargoUsuario = $usuario['cargo'];
+$titularId = obterTitularIdUsuario($usuario);
+$nomeEquipe = obterNomeEquipe($usuario);
 $hoje = date('Y-m-d');
 
 $periodosPermitidos = ['hoje', 'semana', 'mes', 'tudo', 'personalizado'];
@@ -141,71 +144,89 @@ switch ($periodo) {
 
 $usuariosFiltro = [];
 $equipesFiltro = [];
-$visibleUserIds = [$usuarioId];
+$visibleUserIds = buscarIdsUsuariosVisiveis($pdo, $usuario, true);
+$todosUsuariosEquipe = buscarUsuariosDaEquipe($pdo, $titularId, true);
+$subEquipesDashboard = buscarSubEquipesDaConta($pdo, $titularId, true);
 
-if ($cargoUsuario === 'administrador') {
-    $usuariosFiltro = fetchAllAssoc(
-        $pdo,
-        "SELECT id, nome, cargo FROM usuarios WHERE ativo = 1 ORDER BY nome ASC"
-    );
-    $visibleUserIds = array_map(static fn ($item) => (int) $item['id'], $usuariosFiltro);
+if (usuarioEhTitular($usuario)) {
+    $usuariosFiltro = $todosUsuariosEquipe;
+    $equipesFiltro[] = [
+        'id' => 'team:all',
+        'nome' => 'Toda a equipe',
+        'usuarios' => $visibleUserIds,
+    ];
 
-    $supervisores = fetchAllAssoc(
-        $pdo,
-        "SELECT id, nome FROM usuarios WHERE ativo = 1 AND cargo = 'supervisor' ORDER BY nome ASC"
-    );
+    foreach ($subEquipesDashboard as $subEquipe) {
+        $idsSubEquipe = array_values(array_unique(array_filter(array_map(
+            static function (array $item) use ($subEquipe): int {
+                if ((int) ($item['sub_equipe_id'] ?? 0) === (int) $subEquipe['id']) {
+                    return (int) $item['id'];
+                }
 
-    foreach ($supervisores as $supervisor) {
-        $membrosEquipe = fetchAllAssoc(
-            $pdo,
-            "SELECT id, nome
-             FROM usuarios
-             WHERE ativo = 1 AND (id = ? OR supervisor_id = ?)
-             ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, nome ASC",
-            [$supervisor['id'], $supervisor['id'], $supervisor['id']]
-        );
+                if ((int) ($subEquipe['lider_id'] ?? 0) === (int) $item['id']) {
+                    return (int) $item['id'];
+                }
 
-        if (!empty($membrosEquipe)) {
+                return 0;
+            },
+            $todosUsuariosEquipe
+        ))));
+
+        if (!empty($idsSubEquipe)) {
             $equipesFiltro[] = [
-                'id' => 'team:' . (int) $supervisor['id'],
-                'nome' => 'Equipe de ' . $supervisor['nome'],
-                'usuarios' => array_map(static fn ($item) => (int) $item['id'], $membrosEquipe),
+                'id' => 'team:' . (int) $subEquipe['id'],
+                'nome' => $subEquipe['nome'],
+                'usuarios' => $idsSubEquipe,
             ];
         }
     }
-} elseif ($cargoUsuario === 'supervisor') {
-    $usuariosFiltro = fetchAllAssoc(
-        $pdo,
-        "SELECT id, nome, cargo
-         FROM usuarios
-         WHERE ativo = 1 AND (id = ? OR supervisor_id = ?)
-         ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, nome ASC",
-        [$usuarioId, $usuarioId, $usuarioId]
-    );
-    $visibleUserIds = array_map(static fn ($item) => (int) $item['id'], $usuariosFiltro);
-    $equipesFiltro[] = [
-        'id' => 'team:me',
-        'nome' => 'Minha equipe',
-        'usuarios' => $visibleUserIds,
-    ];
+
+    $idsEquipePrincipal = array_values(array_map(
+        static fn (array $item): int => (int) $item['id'],
+        array_filter($todosUsuariosEquipe, static fn (array $item): bool => empty($item['sub_equipe_id']))
+    ));
+
+    if (!empty($idsEquipePrincipal)) {
+        $equipesFiltro[] = [
+            'id' => 'team:main',
+            'nome' => 'Equipe principal',
+            'usuarios' => $idsEquipePrincipal,
+        ];
+    }
 } else {
-    $usuariosFiltro = [
-        [
-            'id' => $usuarioId,
-            'nome' => $nomeUsuario,
-            'cargo' => $cargoUsuario,
-        ],
-    ];
+    $usuariosFiltro = array_values(array_filter(
+        $todosUsuariosEquipe,
+        static fn (array $item): bool => in_array((int) $item['id'], $visibleUserIds, true)
+    ));
+
+    foreach (buscarSubEquipeIdsLideradas($pdo, $usuarioId, $titularId) as $subEquipeId) {
+        $membrosSubEquipe = array_values(array_filter(
+            $todosUsuariosEquipe,
+            static fn (array $item): bool => (int) ($item['sub_equipe_id'] ?? 0) === $subEquipeId
+        ));
+
+        if (!empty($membrosSubEquipe)) {
+            $nomeSubEquipe = $membrosSubEquipe[0]['sub_equipe_nome'] ?? 'Minha sub-equipe';
+            $equipesFiltro[] = [
+                'id' => 'team:' . $subEquipeId,
+                'nome' => $nomeSubEquipe,
+                'usuarios' => array_map(static fn (array $item): int => (int) $item['id'], $membrosSubEquipe),
+            ];
+        }
+    }
 }
 
 $filtroSelecionado = $_GET['responsavel'] ?? 'todos';
+if ($filtroSelecionado === 'team:me') {
+    $filtroSelecionado = 'team:all';
+}
 $scopeUserIds = $visibleUserIds;
 $scopeResumoIds = $visibleUserIds;
 $scopeTipo = 'todos';
 $scopeUsuarioId = null;
-$escopoLabel = $cargoUsuario === 'supervisor' ? 'Minha equipe' : 'Todos os usuários';
+$escopoLabel = count($visibleUserIds) > 1 ? 'Todos os membros visíveis' : $nomeUsuario;
 
-if ($cargoUsuario === 'funcionario') {
+if (!usuarioEhTitular($usuario) && count($visibleUserIds) === 1) {
     $filtroSelecionado = 'user:' . $usuarioId;
     $scopeUserIds = [$usuarioId];
     $scopeResumoIds = [$usuarioId];
@@ -316,16 +337,20 @@ if ($placeholdersPessoas !== '') {
             u.id,
             u.nome,
             u.cargo,
+            u.funcao_equipe,
+            u.sub_equipe_id,
+            se.nome AS sub_equipe_nome,
             COUNT(t.id) AS total,
             SUM(CASE WHEN t.status = 'pendente' THEN 1 ELSE 0 END) AS pendentes,
             SUM(CASE WHEN t.status = 'concluida' THEN 1 ELSE 0 END) AS concluidas,
             SUM(CASE WHEN t.status = 'pendente' AND t.prazo < ? THEN 1 ELSE 0 END) AS atrasadas
          FROM usuarios u
+         LEFT JOIN sub_equipes se ON se.id = u.sub_equipe_id
          LEFT JOIN tarefas t
             ON (t.usuario_id = u.id OR t.atribuida_para = u.id)
            AND $whereEquipe
          WHERE u.id IN ($placeholdersPessoas)
-         GROUP BY u.id, u.nome, u.cargo
+         GROUP BY u.id, u.nome, u.cargo, u.funcao_equipe, u.sub_equipe_id, se.nome
          ORDER BY pendentes DESC, atrasadas DESC, total DESC, u.nome ASC",
         array_merge([$hoje], $paramsEquipe, $paramsPessoas)
     );
@@ -366,7 +391,7 @@ $activePage = 'dashboard';
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard | Óticas Mercês</title>
+    <title>Dashboard | TaskBlue</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -432,14 +457,14 @@ $activePage = 'dashboard';
 
                     <section class="filter-panel">
                         <label class="filter-label" for="responsavel">Visualização</label>
-                        <?php if ($cargoUsuario !== 'funcionario'): ?>
+                        <?php if (count($visibleUserIds) > 1): ?>
                             <select name="responsavel" id="responsavel" class="filter-select" data-dashboard-autosubmit>
                                 <option value="todos" <?= $filtroSelecionado === 'todos' ? 'selected' : '' ?>>
-                                    <?= $cargoUsuario === 'supervisor' ? 'Minha equipe' : 'Todos os usuários' ?>
+                                    Todos os membros visíveis
                                 </option>
 
                                 <?php if (!empty($equipesFiltro)): ?>
-                                    <optgroup label="Equipes">
+                                    <optgroup label="Sub-equipes e áreas">
                                         <?php foreach ($equipesFiltro as $equipeFiltro): ?>
                                             <option value="<?= htmlspecialchars($equipeFiltro['id']) ?>" <?= $filtroSelecionado === $equipeFiltro['id'] ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($equipeFiltro['nome']) ?>
@@ -452,6 +477,11 @@ $activePage = 'dashboard';
                                     <?php foreach ($usuariosFiltro as $usuarioFiltro): ?>
                                         <option value="user:<?= (int) $usuarioFiltro['id'] ?>" <?= $filtroSelecionado === 'user:' . $usuarioFiltro['id'] ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($usuarioFiltro['nome']) ?>
+                                            <?php if (!empty($usuarioFiltro['funcao_equipe'])): ?>
+                                                - <?= htmlspecialchars($usuarioFiltro['funcao_equipe']) ?>
+                                            <?php elseif (!empty($usuarioFiltro['sub_equipe_nome'])): ?>
+                                                - <?= htmlspecialchars($usuarioFiltro['sub_equipe_nome']) ?>
+                                            <?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </optgroup>
@@ -631,7 +661,12 @@ $activePage = 'dashboard';
                                     <div class="team-main">
                                         <div class="team-name-row">
                                             <strong><?= htmlspecialchars($pessoa['nome']) ?></strong>
-                                            <span><?= ucfirst(htmlspecialchars($pessoa['cargo'])) ?></span>
+                                            <span>
+                                                <?= htmlspecialchars($pessoa['funcao_equipe'] ?: montarRotuloCargo($pessoa['cargo'])) ?>
+                                                <?php if (!empty($pessoa['sub_equipe_nome'])): ?>
+                                                    · <?= htmlspecialchars($pessoa['sub_equipe_nome']) ?>
+                                                <?php endif; ?>
+                                            </span>
                                         </div>
                                         <div class="team-meta">
                                             <span><?= (int) ($pessoa['pendentes'] ?? 0) ?> pendentes</span>
@@ -748,7 +783,7 @@ $activePage = 'dashboard';
                                 </div>
                                 <div class="shortcut-text">
                                     <span class="shortcut-title">Gerenciar equipe</span>
-                                    <span class="shortcut-desc">Editar usuários e vínculos</span>
+                                    <span class="shortcut-desc">Editar membros e vínculos</span>
                                 </div>
                                 <svg class="shortcut-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="9 18 15 12 9 6"/>
